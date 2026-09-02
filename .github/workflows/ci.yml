@@ -1,0 +1,39 @@
+name: CI
+
+# Runs the test suite automatically on every push and every pull request
+# targeting main, so a broken build/test is caught before it's merged --
+# no manual "did you remember to run the tests?" step needed.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run the test suite (mvn test)
+        run: mvn -B test
+
+      - name: Publish test results
+        # Always upload the surefire reports, even when tests fail, so the
+        # failure is easy to inspect from the Actions tab instead of only
+        # from the raw console log.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: target/surefire-reports/
+          if-no-files-found: ignore
