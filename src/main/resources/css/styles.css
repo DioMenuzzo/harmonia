@@ -1,0 +1,94 @@
+/* Basic visual style for Harmonia. Adjust the colors to match the
+   hospital's visual identity (logo, institutional palette, etc). */
+
+.root {
+    -fx-font-family: "Segoe UI", sans-serif;
+    -fx-background-color: #f4f6f8;
+}
+
+.login-panel {
+    -fx-background-color: white;
+    -fx-background-radius: 8;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.15), 12, 0, 0, 2);
+    -fx-padding: 32;
+}
+
+.title {
+    -fx-font-size: 22px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #21597f;
+}
+
+.subtitle {
+    -fx-font-size: 16px;
+	-fx-font-family: "Microsoft YaHei UI", helvetica;
+	-fx-font-weight: bold;
+    -fx-text-fill: #666666;
+}
+
+.description {
+    -fx-font-size: 12px;
+	-fx-font-family: "Microsoft YaHei UI", helvetica;
+    -fx-text-fill: #666666;
+}
+
+.module-card {
+    -fx-background-color: white;
+    -fx-background-radius: 10;
+    -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.12), 10, 0, 0, 2);
+    -fx-padding: 24;
+    -fx-cursor: hand;
+    -fx-alignment: center;
+}
+
+.module-card:hover {
+    -fx-background-color: #eaf1f7;
+}
+
+.module-card-title {
+    -fx-font-size: 16px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #21597f;
+}
+
+.top-bar {
+    -fx-background-color: #21597f;
+    -fx-padding: 8 16 8 16;
+}
+
+.top-bar-text {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+}
+
+.primary-button {
+    -fx-text-fill: white;
+    -fx-font-weight: bold;
+    -fx-background-radius: 4;
+}
+
+.secondary-button {
+    -fx-text-fill: black;
+    -fx-font-weight: normal;
+    -fx-background-radius: 4;
+}
+
+.error-label {
+    -fx-text-fill: #c0392b;
+    -fx-font-size: 12px;
+}
+
+/* Minimize/close buttons for the undecorated window (e.g. login) */
+.window-button {
+    -fx-background-color: transparent;
+    -fx-text-fill: #666666;
+    -fx-font-size: 12px;
+    -fx-min-width: 28px;
+    -fx-min-height: 24px;
+    -fx-cursor: hand;
+    -fx-background-radius: 4;
+}
+
+.window-button:hover {
+    -fx-background-color: #e0e0e0;
+}

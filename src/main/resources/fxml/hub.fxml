@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.Menu?>
+<?import javafx.scene.control.MenuBar?>
+<?import javafx.scene.control.MenuItem?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<BorderPane prefHeight="450.0" prefWidth="900.0" style="-fx-background-color: white;" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospital.harmonia.controller.HubController">
+
+    <top>
+        <VBox>
+            <MenuBar>
+                <Menu text="Arquivo">
+                    <MenuItem onAction="#onLogout" text="Voltar para Tela de Login" />
+                </Menu>
+                <Menu text="Ajuda">
+                    <MenuItem onAction="#onAbout" text="Guias" />
+               <MenuItem onAction="#onOpenWebsite" text="Contate o CIAU" />
+                </Menu>
+            </MenuBar>
+
+            <HBox alignment="CENTER_RIGHT" spacing="12">
+                <HBox prefHeight="32.0" HBox.hgrow="ALWAYS" />
+                <ImageView fx:id="profileImageView" fitHeight="32" fitWidth="32">
+                    <image>
+                        <Image url="@/images/default-profile.png" />
+                    </image>
+               <HBox.margin>
+                  <Insets />
+               </HBox.margin>
+                </ImageView>
+                <Label fx:id="userNameLabel">
+               <font>
+                  <Font name="Microsoft YaHei UI Bold" size="12.0" />
+               </font></Label>
+                <Button onAction="#onPreferences" prefHeight="23.0" prefWidth="160.0" style="-fx-background-color: #00a1ff;" styleClass="primary-button" stylesheets="@../css/styles.css" text="PREFERÊNCIAS" textFill="WHITE">
+               <font>
+                  <Font name="Microsoft YaHei UI Bold" size="12.0" />
+               </font></Button>
+                <Button onAction="#onLogout" prefHeight="23.0" prefWidth="90.0" style="-fx-background-color: #61606d;" styleClass="primary-button" stylesheets="@../css/styles.css" text="SAIR" textFill="WHITE">
+               <HBox.margin>
+                  <Insets right="10.0" />
+               </HBox.margin>
+               <font>
+                  <Font name="Microsoft YaHei UI Bold" size="12.0" />
+               </font></Button>
+            </HBox>
+        </VBox>
+    </top>
+
+    <center>
+        <VBox alignment="CENTER" prefHeight="399.0" prefWidth="850.0" spacing="24">
+            <padding>
+                <Insets bottom="40" left="40" right="40" top="40" />
+            </padding>
+
+            <Label text="SELECIONE O MÓDULO DESEJADO:">
+            <font>
+               <Font name="Microsoft YaHei UI Bold" size="18.0" />
+            </font></Label>
+
+            <HBox alignment="CENTER" spacing="24">
+                <VBox fx:id="cafeteriaCard" alignment="CENTER" onMouseClicked="#onOpenCafeteria" prefHeight="160.0" prefWidth="200.0" styleClass="module-card" stylesheets="@../css/styles.css">
+               <ImageView fitHeight="70.0" fitWidth="70.0" pickOnBounds="true" preserveRatio="true">
+                  <image>
+                     <Image url="@../images/ref-icon.png" />
+                  </image>
+                  <VBox.margin>
+                     <Insets bottom="10.0" />
+                  </VBox.margin>
+               </ImageView>
+                    <Label text="REFEITÓRIO">
+                  <font>
+                     <Font name="Microsoft YaHei UI Bold" size="12.0" />
+                  </font></Label>
+                    <Label alignment="CENTER" styleClass="description" text="Gestão de Refeições" wrapText="true">
+                  <font>
+                     <Font name="Microsoft YaHei UI" size="12.0" />
+                  </font></Label>
+                </VBox>
+
+                <VBox fx:id="assetDisposalCard" alignment="CENTER" onMouseClicked="#onOpenAssetDisposal" prefHeight="160.0" prefWidth="200.0" styleClass="module-card" stylesheets="@../css/styles.css">
+               <ImageView fitHeight="70.0" fitWidth="70.0" pickOnBounds="true" preserveRatio="true">
+                  <image>
+                     <Image url="@../images/da-icon.png" />
+                  </image>
+                  <VBox.margin>
+                     <Insets bottom="10.0" />
+                  </VBox.margin>
+               </ImageView>
+                    <Label text="DESCARTE DE ATIVOS">
+                  <font>
+                     <Font name="Microsoft YaHei UI Bold" size="12.0" />
+                  </font></Label>
+                    <Label styleClass="description" text="Gerador de Laudos" wrapText="true">
+                  <font>
+                     <Font name="Microsoft YaHei UI" size="12.0" />
+                  </font></Label>
+                </VBox>
+
+                <VBox fx:id="printersCard" alignment="CENTER" onMouseClicked="#onOpenPrinters" prefHeight="160" prefWidth="200" styleClass="module-card" stylesheets="@../css/styles.css">
+               <ImageView fitHeight="70.0" fitWidth="70.0" pickOnBounds="true" preserveRatio="true">
+                  <image>
+                     <Image url="@../images/imp-icon.png" />
+                  </image>
+                  <VBox.margin>
+                     <Insets bottom="10.0" />
+                  </VBox.margin>
+               </ImageView>
+                    <Label text="IMPRESSORAS">
+                  <font>
+                     <Font name="Microsoft YaHei UI Bold" size="12.0" />
+                  </font></Label>
+                    <Label prefHeight="30.0" prefWidth="166.0" styleClass="description" text="Registro de Assistência Técnica" textAlignment="CENTER" wrapText="true">
+                  <font>
+                     <Font name="Microsoft YaHei UI" size="12.0" />
+                  </font></Label>
+                </VBox>
+            </HBox>
+        </VBox>
+    </center>
+
+</BorderPane>

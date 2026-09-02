@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Simple template for a technical asset write-off report (1 page per report).
+     Feel free to edit it visually in Jaspersoft Studio to add the hospital's
+     letterhead/logo, signature fields, etc. -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="laudo_baixa_ativo_report" pageWidth="595" pageHeight="842"
+              columnWidth="535" leftMargin="30" rightMargin="30" topMargin="30" bottomMargin="30">
+
+    <field name="assetTagNumber" class="java.lang.String"/>
+    <field name="assetDescription" class="java.lang.String"/>
+    <field name="location" class="java.lang.String"/>
+    <field name="acquisitionDate" class="java.time.LocalDate"/>
+    <field name="acquisitionValue" class="java.lang.String"/>
+    <field name="disposalReason" class="java.lang.String"/>
+    <field name="technicalOpinion" class="java.lang.String"/>
+    <field name="technicalOfficer" class="java.lang.String"/>
+    <field name="reportDate" class="java.time.LocalDate"/>
+    <field name="status" class="java.lang.String"/>
+
+    <title>
+        <band height="70">
+            <staticText>
+                <reportElement x="0" y="0" width="535" height="30"/>
+                <textElement textAlignment="Center"><font size="16" isBold="true"/></textElement>
+                <text><![CDATA[LAUDO TECNICO PARA AUTORIZACAO DE BAIXA PATRIMONIAL]]></text>
+            </staticText>
+            <textField pattern="dd/MM/yyyy">
+                <reportElement x="0" y="36" width="535" height="20"/>
+                <textElement textAlignment="Center"/>
+                <textFieldExpression><![CDATA["Data do laudo: " + $F{reportDate}]]></textFieldExpression>
+            </textField>
+        </band>
+    </title>
+
+    <detail>
+        <band height="420">
+            <staticText>
+                <reportElement x="0" y="0" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Numero de patrimonio:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="0" width="335" height="18"/>
+                <textFieldExpression><![CDATA[$F{assetTagNumber}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="24" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Descricao do ativo:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="24" width="335" height="18"/>
+                <textFieldExpression><![CDATA[$F{assetDescription}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="48" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Localizacao:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="48" width="335" height="18"/>
+                <textFieldExpression><![CDATA[$F{location}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="72" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Data de aquisicao:]]></text>
+            </staticText>
+            <textField pattern="dd/MM/yyyy">
+                <reportElement x="200" y="72" width="150" height="18"/>
+                <textFieldExpression><![CDATA[$F{acquisitionDate}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="96" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Valor de aquisicao:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="96" width="335" height="18"/>
+                <textFieldExpression><![CDATA[$F{acquisitionValue}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="130" width="535" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Motivo da baixa:]]></text>
+            </staticText>
+            <textField isStretchWithOverflow="true">
+                <reportElement x="0" y="150" width="535" height="70"/>
+                <textElement textAlignment="Justified"/>
+                <textFieldExpression><![CDATA[$F{disposalReason}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="230" width="535" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Parecer tecnico:]]></text>
+            </staticText>
+            <textField isStretchWithOverflow="true">
+                <reportElement x="0" y="250" width="535" height="70"/>
+                <textElement textAlignment="Justified"/>
+                <textFieldExpression><![CDATA[$F{technicalOpinion}]]></textFieldExpression>
+            </textField>
+
+            <staticText>
+                <reportElement x="0" y="340" width="200" height="18"/>
+                <textElement><font isBold="true"/></textElement>
+                <text><![CDATA[Situacao:]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="200" y="340" width="335" height="18"/>
+                <textFieldExpression><![CDATA[$F{status}]]></textFieldExpression>
+            </textField>
+
+            <line>
+                <reportElement x="0" y="380" width="535" height="1"/>
+            </line>
+            <textField>
+                <reportElement x="0" y="386" width="535" height="18"/>
+                <textElement textAlignment="Center"/>
+                <textFieldExpression><![CDATA["Responsavel tecnico: " + $F{technicalOfficer}]]></textFieldExpression>
+            </textField>
+        </band>
+    </detail>
+
+</jasperReport>

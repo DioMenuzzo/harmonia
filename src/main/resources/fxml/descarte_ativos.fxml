@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane xmlns="http://javafx.com/javafx"
+            xmlns:fx="http://javafx.com/fxml"
+            fx:controller="com.hospital.harmonia.controller.AssetDisposalController"
+            prefWidth="900" prefHeight="620">
+
+    <top>
+        <HBox styleClass="top-bar" spacing="12" alignment="CENTER_LEFT">
+            <Button text="◀ Voltar ao hub" onAction="#onBack"/>
+            <Label text="Modulo Descarte de Ativos" styleClass="top-bar-text"/>
+        </HBox>
+    </top>
+
+    <center>
+        <VBox alignment="CENTER" spacing="12">
+            <Label text="Modulo em construcao" styleClass="subtitle"/>
+            <Label text="A funcionalidade completa de Descarte de Ativos sera adicionada em uma proxima atualizacao."
+                   wrapText="true" maxWidth="420" style="-fx-text-alignment: center;"/>
+        </VBox>
+    </center>
+</BorderPane>

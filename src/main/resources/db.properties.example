@@ -1,0 +1,23 @@
+# =====================================================================
+# Database connection template.
+#
+# Copy this file to "db.properties" (same folder) and fill in the real
+# values for your environment. The real "db.properties" must NEVER be
+# committed -- it is already excluded in .gitignore.
+#
+# Safer alternative for shared/production environments: set the
+# DB_URL, DB_USER, DB_PASSWORD (and EXTERNAL_DB_*) environment variables
+# instead -- they take priority over this file. See DatabaseConfig.java.
+# =====================================================================
+
+db.url=jdbc:postgresql://localhost:5432/sysgest_hospital
+db.user=postgres
+db.password=changeme
+db.pool.maxSize=10
+db.pool.minIdle=2
+
+# External database used by the Asset Disposal module (e.g. the hospital's
+# existing asset-management system).
+external.db.url=jdbc:postgresql://localhost:5432/db1
+external.db.user=changeme
+external.db.password=changeme

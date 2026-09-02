@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.Cursor?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.AnchorPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+<?import javafx.scene.text.Font?>
+
+<AnchorPane prefHeight="503.0" prefWidth="1000.0" xmlns="http://javafx.com/javafx/17" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospital.harmonia.controller.LoginController">
+   <children>
+      <ImageView fitHeight="508.0" fitWidth="760.0" layoutX="300.0" pickOnBounds="true" preserveRatio="true">
+         <image>
+            <Image url="@../images/login-panel.png" />
+         </image>
+      </ImageView>
+   
+                   <VBox alignment="CENTER" layoutY="-5.0" maxHeight="508.0" maxWidth="324.0" prefHeight="508.0" prefWidth="300.0" spacing="16">
+           <padding>
+               <Insets bottom="8" left="8" right="8" top="8" />
+           </padding>
+   
+                       <Label text="Harmonia">
+            <font>
+               <Font name="Mistral" size="48.0" />
+            </font>
+         </Label>
+           <Label text="Entre com seu usuário e senha" />
+   
+                          <VBox prefHeight="40.0" prefWidth="284.0" spacing="4">
+               <TextField fx:id="usernameField" alignment="CENTER" prefHeight="40.0" prefWidth="251.0" promptText="Usuário">
+               <font>
+                  <Font name="Microsoft YaHei UI" size="12.0" />
+               </font>
+            </TextField>
+           </VBox>
+   
+                       <VBox spacing="4">
+               <PasswordField fx:id="passwordField" alignment="CENTER" onAction="#onLogin" prefHeight="40.0" prefWidth="284.0" promptText="Senha" />
+           </VBox>
+   
+                       <Label fx:id="errorLabel" layoutX="50.0" layoutY="320.0" managed="false" styleClass="error-label" visible="false" wrapText="true" />
+   
+                       <Button defaultButton="true" maxWidth="Infinity" onAction="#onLogin" prefHeight="40.0" prefWidth="284.0" style="-fx-background-color: BLack;" text="ENTRAR" textFill="WHITE">
+            <font>
+               <Font name="Microsoft YaHei UI Bold" size="12.0" />
+            </font>
+         </Button>
+       </VBox>
+   
+                <!-- Manual minimize/close buttons: the window is UNDECORATED (no
+            Windows title bar), so these controls replace the native ones.
+                     Clicking/dragging any empty area of the window moves it
+                     (see onDragPressed/onDragMoved in the controller). -->
+       <HBox alignment="TOP_RIGHT" prefHeight="33.0" prefWidth="1060.0" spacing="4">
+           <padding>
+               <Insets bottom="0" left="0" right="8" top="8" />
+           </padding>
+           <Button onAction="#onMinimize" style="-fx-background-color: transparent;" text="─" textFill="WHITE">
+            <cursor>
+               <Cursor fx:constant="HAND" />
+            </cursor></Button>
+           <Button onAction="#onClose" style="-fx-background-color: transparent;" text="✕" textFill="WHITE">
+            <cursor>
+               <Cursor fx:constant="HAND" />
+            </cursor>
+            <font>
+               <Font name="System Bold" size="12.0" />
+            </font></Button>
+       </HBox>
+   </children>
+</AnchorPane>

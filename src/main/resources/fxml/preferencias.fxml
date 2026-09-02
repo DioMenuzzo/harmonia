@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.image.Image?>
+<?import javafx.scene.image.ImageView?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox xmlns="http://javafx.com/javafx"
+      xmlns:fx="http://javafx.com/fxml"
+      fx:controller="com.hospital.harmonia.controller.PreferencesController"
+      spacing="20" prefWidth="480" prefHeight="360">
+    <padding>
+        <Insets top="24" right="24" bottom="24" left="24"/>
+    </padding>
+
+    <HBox spacing="12" alignment="CENTER_LEFT">
+        <Button text="◀ Voltar" onAction="#onBack"/>
+        <Label text="Preferencias" styleClass="title"/>
+    </HBox>
+
+    <VBox spacing="8" alignment="CENTER_LEFT">
+        <Label text="Foto de perfil" styleClass="subtitle"/>
+        <ImageView fx:id="profileImagePreview" fitWidth="96" fitHeight="96">
+            <image>
+                <Image url="@/images/default-profile.png"/>
+            </image>
+        </ImageView>
+        <Button text="Escolher imagem..." onAction="#onChoosePhoto"/>
+    </VBox>
+
+    <VBox spacing="8">
+        <Label text="Usuario logado" styleClass="subtitle"/>
+        <Label fx:id="userInfoLabel"/>
+    </VBox>
+
+    <Button text="Salvar" styleClass="primary-button" onAction="#onSave"/>
+</VBox>

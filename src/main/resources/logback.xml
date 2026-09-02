@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Logging configuration (SLF4J + Logback).
+
+    Two appenders are active by default:
+      - CONSOLE: everything, printed to stdout; useful while developing
+        in the IDE (Eclipse) or running "mvn javafx:run".
+      - FILE: everything, written to logs/harmonia.log, rotated daily and
+        whenever it passes 10MB, keeping 30 days / 300MB of history. This is
+        what you (or, later, an ops/support person) would check after the
+        fact if a user reports an error; the on-screen alert only shows a
+        short, user-friendly message, the full stack trace always goes here.
+
+    Root level is INFO (quiet, production-friendly). The application's own
+    package is bumped to DEBUG so day-to-day development shows more detail;
+    turn it back down to INFO (or WARN) for a "production" build simply by
+    changing the single logger element below; no code changes needed.
+-->
+<configuration>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/harmonia.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/harmonia.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>300MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%thread] %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Application code: DEBUG during development. -->
+    <logger name="com.hospital.harmonia" level="DEBUG"/>
+
+    <!-- Third-party libraries stay at INFO/WARN to avoid noisy logs. -->
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+    <logger name="net.sf.jasperreports" level="WARN"/>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+</configuration>

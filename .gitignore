@@ -1,0 +1,23 @@
+target/
+*.class
+.settings/
+.project
+.classpath
+bin/
+fotos_perfil/
+anexos_garantia/
+logs/
+*.log
+.DS_Store
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Local secrets -- never commit real credentials; use environment variables
+# (DB_URL, DB_USER, DB_PASSWORD) in shared/production environments instead.
+# The real db.properties (with your actual DB credentials) must never be
+# committed -- copy src/main/resources/db.properties.example instead.
+src/main/resources/db.properties
+db.properties.local
