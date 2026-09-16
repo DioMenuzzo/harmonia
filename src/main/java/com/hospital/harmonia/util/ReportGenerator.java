@@ -40,7 +40,7 @@ public final class ReportGenerator {
                 jrxmlResourcePath, data.size(), outputFile.getAbsolutePath());
         try (InputStream jrxmlStream = ReportGenerator.class.getResourceAsStream(jrxmlResourcePath)) {
             if (jrxmlStream == null) {
-                throw new IllegalArgumentException("Relatorio nao encontrado no classpath: " + jrxmlResourcePath);
+                throw new IllegalArgumentException("Relatório não encontrado no classpath: " + jrxmlResourcePath);
             }
             JasperReport jasperReport = JasperCompileManager.compileReport(jrxmlStream);
             JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(data);

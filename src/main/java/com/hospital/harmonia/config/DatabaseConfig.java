@@ -22,7 +22,7 @@ import java.util.Properties;
  * INDEPENDENTLY (the "initialization-on-demand holder" idiom, via static
  * nested classes). This is intentional: if the external asset database is
  * misconfigured, unavailable, or simply hasn't been configured yet, that
- * MUST NOT prevent the rest of the system (login, cafeteria, printers) from
+ * MUST NOT prevent the rest of the system (login, cafeteria, technical support) from
  * working -- only the Asset Disposal module is affected, and only when it
  * actually tries to query the external database.
  *
@@ -121,7 +121,7 @@ public final class DatabaseConfig {
             }
         } catch (IOException e) {
             log.error("Failed to load db.properties", e);
-            throw new RuntimeException("Nao foi possivel carregar db.properties", e);
+            throw new RuntimeException("Não foi possível carregar db.properties", e);
         }
         return props;
     }

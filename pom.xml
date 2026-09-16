@@ -70,6 +70,13 @@
             <version>${jasper.version}</version>
         </dependency>
 
+        <!-- ============ Geracao de planilhas Excel (relatorio .xlsx) ============ -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
+        </dependency>
+
         <!-- ============ Hash de senha (BCrypt) ============ -->
         <dependency>
             <groupId>org.mindrot</groupId>
@@ -139,6 +146,11 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>${mainClass}</mainClass>
                                 </transformer>
+                                <!-- Necessario para o Apache POI (relatorio .xlsx): varias bibliotecas
+                                     dentro dele registram servicos no mesmo arquivo em META-INF/services,
+                                     e sem isso o maven-shade-plugin mantém so o ultimo, quebrando em
+                                     tempo de execucao. Este transformer faz a mesclagem (merge) correta. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                             </transformers>
                         </configuration>
                     </execution>

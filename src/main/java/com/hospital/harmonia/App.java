@@ -80,6 +80,19 @@ public class App extends Application {
         scene.getStylesheets().add(Objects.requireNonNull(App.class.getResource("/css/styles.css")).toExternalForm());
         mainStage.setScene(scene);
         mainStage.setTitle(title);
+        // Each screen's FXML declares its own prefWidth/prefHeight (the hub is
+        // deliberately small -- 900x450 -- while a module like Refeitório or
+        // Assistência Técnica is much bigger, e.g. 1150x680). setScene() alone
+        // does NOT resize an already-shown Stage to match the new scene's
+        // preferred size -- without this call the window stays stuck at
+        // whatever size it had on the previous screen (typically the hub's),
+        // so a bigger screen shows up cramped/clipped instead of at its
+        // designed size. Skipped while maximized: sizeToScene() would fight
+        // the OS-maximized size and isn't needed there anyway (the window
+        // already fills the screen).
+        if (!mainStage.isMaximized()) {
+            mainStage.sizeToScene();
+        }
         mainStage.centerOnScreen();
     }
 
