@@ -43,7 +43,7 @@ public class MealPriceService {
             BigDecimal price = entry.getValue();
             if (price == null || price.signum() < 0) {
                 throw new IllegalArgumentException(
-                        "Preco de " + entry.getKey().getDescription() + " invalido.");
+                        "Preço de " + entry.getKey().getDescription() + " inválido.");
             }
         }
         for (Map.Entry<MealType, BigDecimal> entry : prices.entrySet()) {

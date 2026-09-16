@@ -77,6 +77,93 @@ class MealServiceTest {
         assertEquals(1, fakeDao.saved.size());
     }
 
+    // --- One meal per type per employee per day (agreed with RH) ---
+
+    @Test
+    void register_rejectsASecondMealOfTheSameTypeOnTheSameDay() {
+        service.register(validMeal()); // Almoço, 2026-02-10
+
+        Meal secondLunch = validMeal();
+        secondLunch.setTime(LocalTime.of(13, 30));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.register(secondLunch));
+        assertTrue(ex.getMessage().contains("Almoço"), "message should name the conflicting meal type");
+        assertEquals(1, fakeDao.saved.size(), "the second (rejected) lunch must not reach the DAO");
+    }
+
+    @Test
+    void register_allowsDifferentMealTypesOnTheSameDay() {
+        service.register(validMeal()); // Almoço
+
+        Meal dinner = validMeal();
+        dinner.setType(MealType.JANTAR);
+        dinner.setTime(LocalTime.of(19, 0));
+        service.register(dinner);
+
+        assertEquals(2, fakeDao.saved.size());
+    }
+
+    @Test
+    void register_allowsTheSameMealTypeOnADifferentDay() {
+        service.register(validMeal()); // Almoço, 2026-02-10
+
+        Meal nextDayLunch = validMeal();
+        nextDayLunch.setDate(LocalDate.of(2026, 2, 11));
+        service.register(nextDayLunch);
+
+        assertEquals(2, fakeDao.saved.size());
+    }
+
+    @Test
+    void register_allowsTheSameMealTypeForADifferentEmployeeOnTheSameDay() {
+        service.register(validMeal()); // employeeId=1, Almoço
+
+        Meal otherEmployeeLunch = validMeal();
+        otherEmployeeLunch.setEmployeeId(2);
+        service.register(otherEmployeeLunch);
+
+        assertEquals(2, fakeDao.saved.size());
+    }
+
+    @Test
+    void register_allowsAnotherMealOfTheSameTypeOnceTheFirstIsDeactivated() {
+        Meal firstLunch = service.register(validMeal());
+        service.deactivate(firstLunch.getId());
+
+        Meal secondLunch = validMeal();
+        secondLunch.setTime(LocalTime.of(13, 0));
+        service.register(secondLunch); // must not throw -- the canceled lunch no longer counts
+
+        assertEquals(2, fakeDao.saved.size());
+    }
+
+    @Test
+    void update_doesNotConflictWithTheRecordBeingEdited() {
+        Meal lunch = service.register(validMeal());
+        lunch.setTime(LocalTime.of(12, 15)); // same day, same type -- just correcting the time
+        service.update(lunch); // must not throw
+        assertEquals(12, fakeDao.saved.get(0).getTime().getHour());
+    }
+
+    @Test
+    void register_allowsMultipleMealsOfTheSameTypeWhenEmployeeUsesSharedRegistration() {
+        // A shared matrícula (e.g. "plantão médico" badge used by whichever
+        // doctor is on call) is expected to have several people eating under
+        // it on the same day -- the one-meal-per-type-per-day rule must not
+        // apply to it (see Employee.sharedUsage / Meal.employeeSharedUsage).
+        Meal firstLunch = validMeal();
+        firstLunch.setEmployeeSharedUsage(true);
+        service.register(firstLunch);
+
+        Meal secondLunch = validMeal();
+        secondLunch.setEmployeeSharedUsage(true);
+        secondLunch.setTime(LocalTime.of(13, 0));
+        service.register(secondLunch); // must not throw
+
+        assertEquals(2, fakeDao.saved.size());
+    }
+
     @Test
     void findByPeriod_rejectsAStartDateAfterTheEndDate() {
         LocalDate start = LocalDate.of(2026, 2, 10);
@@ -104,9 +191,16 @@ class MealServiceTest {
     /** Minimal in-memory stand-in for MealDaoImpl -- no database involved. */
     private static class FakeMealDao implements MealDao {
         final List<Meal> saved = new ArrayList<>();
+        // Mirrors the real DAO assigning an id via Postgres' "RETURNING id"
+        // on INSERT -- without this, every saved meal would keep id == null
+        // forever, which would let checkNoDuplicateMealType's self-exclusion
+        // (by id) silently treat any two different null-id meals as "the
+        // same record" instead of catching a real conflict between them.
+        private int nextId = 1;
 
         @Override
         public Meal save(Meal meal) {
+            meal.setId(nextId++);
             saved.add(meal);
             return meal;
         }

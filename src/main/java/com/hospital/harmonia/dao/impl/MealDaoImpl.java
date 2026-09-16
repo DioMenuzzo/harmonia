@@ -47,7 +47,7 @@ public class MealDaoImpl implements MealDao {
             return m;
         } catch (SQLException e) {
             log.error("Failed to save meal (employeeId={})", m.getEmployeeId(), e);
-            throw new DataAccessException("Erro ao salvar refeicao", e);
+            throw new DataAccessException("Erro ao salvar refeição", e);
         }
     }
 
@@ -67,7 +67,7 @@ public class MealDaoImpl implements MealDao {
             log.info("Meal updated: id={}", m.getId());
         } catch (SQLException e) {
             log.error("Failed to update meal id={}", m.getId(), e);
-            throw new DataAccessException("Erro ao atualizar refeicao " + m.getId(), e);
+            throw new DataAccessException("Erro ao atualizar refeição " + m.getId(), e);
         }
     }
 
@@ -83,7 +83,7 @@ public class MealDaoImpl implements MealDao {
             log.warn("Meal permanently removed: id={}", id);
         } catch (SQLException e) {
             log.error("Failed to remove meal id={}", id, e);
-            throw new DataAccessException("Erro ao remover refeicao " + id, e);
+            throw new DataAccessException("Erro ao remover refeição " + id, e);
         }
     }
 
@@ -99,7 +99,7 @@ public class MealDaoImpl implements MealDao {
             log.info("Meal deactivated: id={}", id);
         } catch (SQLException e) {
             log.error("Failed to deactivate meal id={}", id, e);
-            throw new DataAccessException("Erro ao inativar refeicao " + id, e);
+            throw new DataAccessException("Erro ao inativar refeição " + id, e);
         }
     }
 
@@ -113,7 +113,7 @@ public class MealDaoImpl implements MealDao {
             log.info("Meal activated: id={}", id);
         } catch (SQLException e) {
             log.error("Failed to activate meal id={}", id, e);
-            throw new DataAccessException("Erro ao ativar refeicao " + id, e);
+            throw new DataAccessException("Erro ao ativar refeição " + id, e);
         }
     }
 
@@ -121,7 +121,9 @@ public class MealDaoImpl implements MealDao {
     public List<Meal> findByPeriod(LocalDate start, LocalDate end) {
         // Brings back active AND inactive -- this list feeds the screen's
         // table/audit log, so it needs to show everything registered in the period.
-        String sql = "SELECT r.*, c.nome AS nome_colaborador FROM refeicoes r " +
+        String sql = "SELECT r.*, c.nome AS nome_colaborador, c.empresa_terceirizada AS categoria_colaborador, " +
+                "c.uso_compartilhado AS colaborador_compartilhado " +
+                "FROM refeicoes r " +
                 "JOIN colaboradores c ON c.id = r.colaborador_id " +
                 "WHERE r.data BETWEEN ? AND ? ORDER BY r.data, r.horario";
         try (Connection conn = DatabaseConfig.getConnection();
@@ -131,7 +133,7 @@ public class MealDaoImpl implements MealDao {
             return runQuery(stmt);
         } catch (SQLException e) {
             log.error("Failed to list meals by period {} - {}", start, end, e);
-            throw new DataAccessException("Erro ao listar refeicoes por periodo", e);
+            throw new DataAccessException("Erro ao listar refeições por período", e);
         }
     }
 
@@ -139,7 +141,9 @@ public class MealDaoImpl implements MealDao {
     public List<Meal> findActiveByPeriod(LocalDate start, LocalDate end) {
         // Used in the PDF report and in the total spent calculation -- deactivated
         // (canceled) meals must not enter the billing nor the report.
-        String sql = "SELECT r.*, c.nome AS nome_colaborador FROM refeicoes r " +
+        String sql = "SELECT r.*, c.nome AS nome_colaborador, c.empresa_terceirizada AS categoria_colaborador, " +
+                "c.uso_compartilhado AS colaborador_compartilhado " +
+                "FROM refeicoes r " +
                 "JOIN colaboradores c ON c.id = r.colaborador_id " +
                 "WHERE r.ativo = TRUE AND r.data BETWEEN ? AND ? ORDER BY r.data, r.horario";
         try (Connection conn = DatabaseConfig.getConnection();
@@ -149,13 +153,15 @@ public class MealDaoImpl implements MealDao {
             return runQuery(stmt);
         } catch (SQLException e) {
             log.error("Failed to list active meals by period {} - {}", start, end, e);
-            throw new DataAccessException("Erro ao listar refeicoes ativas por periodo", e);
+            throw new DataAccessException("Erro ao listar refeições ativas por período", e);
         }
     }
 
     @Override
     public List<Meal> findByEmployeeAndPeriod(int employeeId, LocalDate start, LocalDate end) {
-        String sql = "SELECT r.*, c.nome AS nome_colaborador FROM refeicoes r " +
+        String sql = "SELECT r.*, c.nome AS nome_colaborador, c.empresa_terceirizada AS categoria_colaborador, " +
+                "c.uso_compartilhado AS colaborador_compartilhado " +
+                "FROM refeicoes r " +
                 "JOIN colaboradores c ON c.id = r.colaborador_id " +
                 "WHERE r.colaborador_id = ? AND r.data BETWEEN ? AND ? ORDER BY r.data, r.horario";
         try (Connection conn = DatabaseConfig.getConnection();
@@ -166,7 +172,7 @@ public class MealDaoImpl implements MealDao {
             return runQuery(stmt);
         } catch (SQLException e) {
             log.error("Failed to list meals for employeeId={}", employeeId, e);
-            throw new DataAccessException("Erro ao listar refeicoes do colaborador", e);
+            throw new DataAccessException("Erro ao listar refeições do colaborador", e);
         }
     }
 
@@ -178,6 +184,8 @@ public class MealDaoImpl implements MealDao {
                 m.setId(rs.getInt("id"));
                 m.setEmployeeId(rs.getInt("colaborador_id"));
                 m.setEmployeeName(rs.getString("nome_colaborador"));
+                m.setEmployeeCategory(rs.getString("categoria_colaborador"));
+                m.setEmployeeSharedUsage(rs.getBoolean("colaborador_compartilhado"));
                 m.setDate(rs.getDate("data").toLocalDate());
                 m.setTime(rs.getTime("horario").toLocalTime());
                 m.setPrice(rs.getBigDecimal("preco"));

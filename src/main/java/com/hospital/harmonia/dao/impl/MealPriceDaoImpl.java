@@ -35,7 +35,7 @@ public class MealPriceDaoImpl implements MealPriceDao {
             return prices;
         } catch (SQLException e) {
             log.error("Failed to list meal prices", e);
-            throw new DataAccessException("Erro ao listar precos de refeicao", e);
+            throw new DataAccessException("Erro ao listar preços de refeição", e);
         }
     }
 
@@ -53,7 +53,7 @@ public class MealPriceDaoImpl implements MealPriceDao {
             log.info("Meal price updated: type={} price={}", type, price);
         } catch (SQLException e) {
             log.error("Failed to save price for type={}", type, e);
-            throw new DataAccessException("Erro ao salvar preco de " + type, e);
+            throw new DataAccessException("Erro ao salvar preço de " + type, e);
         }
     }
 }

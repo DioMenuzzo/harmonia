@@ -30,14 +30,15 @@ public class EmployeeDaoImpl implements EmployeeDao {
 
     @Override
     public Employee save(Employee e) {
-        String sql = "INSERT INTO colaboradores (nome, cpf, empresa_terceirizada, cargo, ativo) " +
-                "VALUES (?, ?, ?, ?, TRUE) RETURNING id";
+        String sql = "INSERT INTO colaboradores (nome, cpf, empresa_terceirizada, cargo, uso_compartilhado, ativo) " +
+                "VALUES (?, ?, ?, ?, ?, TRUE) RETURNING id";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, e.getName());
             stmt.setString(2, e.getRegistrationNumber());
             stmt.setString(3, e.getCategory());
             stmt.setString(4, e.getJobTitle());
+            stmt.setBoolean(5, e.isSharedUsage());
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
                     e.setId(rs.getInt(1));
@@ -49,7 +50,7 @@ public class EmployeeDaoImpl implements EmployeeDao {
             if (SQLSTATE_UNIQUE_VIOLATION.equals(ex.getSQLState())) {
                 log.warn("Attempt to register duplicate registration number: {}", e.getRegistrationNumber());
                 throw new IllegalArgumentException(
-                        "Ja existe um colaborador cadastrado com a matricula " + e.getRegistrationNumber() + ".");
+                        "Já existe um colaborador cadastrado com a matrícula " + e.getRegistrationNumber() + ".");
             }
             log.error("Failed to save employee (registrationNumber={})", e.getRegistrationNumber(), ex);
             throw new DataAccessException("Erro ao salvar colaborador", ex);
@@ -82,7 +83,7 @@ public class EmployeeDaoImpl implements EmployeeDao {
             }
         } catch (SQLException e) {
             log.error("Failed to fetch employee by registration number={}", registrationNumber, e);
-            throw new DataAccessException("Erro ao buscar colaborador por matricula " + registrationNumber, e);
+            throw new DataAccessException("Erro ao buscar colaborador por matrícula " + registrationNumber, e);
         }
     }
 
@@ -113,16 +114,17 @@ public class EmployeeDaoImpl implements EmployeeDao {
 
     @Override
     public void update(Employee e) {
-        String sql = "UPDATE colaboradores SET nome = ?, cpf = ?, empresa_terceirizada = ?, cargo = ?, ativo = ? " +
-                "WHERE id = ?";
+        String sql = "UPDATE colaboradores SET nome = ?, cpf = ?, empresa_terceirizada = ?, cargo = ?, " +
+                "uso_compartilhado = ?, ativo = ? WHERE id = ?";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, e.getName());
             stmt.setString(2, e.getRegistrationNumber());
             stmt.setString(3, e.getCategory());
             stmt.setString(4, e.getJobTitle());
-            stmt.setBoolean(5, e.isActive());
-            stmt.setInt(6, e.getId());
+            stmt.setBoolean(5, e.isSharedUsage());
+            stmt.setBoolean(6, e.isActive());
+            stmt.setInt(7, e.getId());
             stmt.executeUpdate();
             log.info("Employee updated: id={}", e.getId());
         } catch (SQLException ex) {
@@ -130,7 +132,7 @@ public class EmployeeDaoImpl implements EmployeeDao {
                 log.warn("Attempt to update employee id={} to duplicate registration number: {}",
                         e.getId(), e.getRegistrationNumber());
                 throw new IllegalArgumentException(
-                        "Ja existe outro colaborador cadastrado com a matricula " + e.getRegistrationNumber() + ".");
+                        "Já existe outro colaborador cadastrado com a matrícula " + e.getRegistrationNumber() + ".");
             }
             log.error("Failed to update employee id={}", e.getId(), ex);
             throw new DataAccessException("Erro ao atualizar colaborador " + e.getId(), ex);
@@ -174,6 +176,7 @@ public class EmployeeDaoImpl implements EmployeeDao {
         e.setRegistrationNumber(rs.getString("cpf"));
         e.setCategory(rs.getString("empresa_terceirizada"));
         e.setJobTitle(rs.getString("cargo"));
+        e.setSharedUsage(rs.getBoolean("uso_compartilhado"));
         e.setActive(rs.getBoolean("ativo"));
         return e;
     }

@@ -12,6 +12,14 @@ public class Employee {
     private String category;
     private String jobTitle; // no longer has a field on the form (removed by the user), kept for the DB column
     private boolean active = true;
+    // Some registrations (matrícula/crachá) are intentionally shared by more
+    // than one person -- e.g. a "plantão médico" badge used by whichever
+    // doctor is on call, not tied to a single individual. When true, the
+    // one-meal-per-type-per-day rule (MealService.checkNoDuplicateMealType)
+    // is skipped for meals registered under this employee, since several
+    // different people legitimately eating under the same matrícula on the
+    // same day is expected here, not a duplicate.
+    private boolean sharedUsage = false;
 
     public Employee() {
     }
@@ -70,6 +78,14 @@ public class Employee {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public boolean isSharedUsage() {
+        return sharedUsage;
+    }
+
+    public void setSharedUsage(boolean sharedUsage) {
+        this.sharedUsage = sharedUsage;
     }
 
     @Override
