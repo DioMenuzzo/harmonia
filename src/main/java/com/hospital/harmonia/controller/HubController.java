@@ -25,7 +25,8 @@ public class HubController implements Initializable {
 
     @FXML private VBox cafeteriaCard;
     @FXML private VBox assetDisposalCard;
-    @FXML private VBox printersCard;
+    @FXML private VBox technicalSupportCard;
+    @FXML private VBox usersCard;
     @FXML private Label userNameLabel;
     @FXML private ImageView profileImageView;
 
@@ -54,45 +55,57 @@ public class HubController implements Initializable {
         assetDisposalCard.setVisible(user.getRole().canAccessAssetDisposal());
         assetDisposalCard.setManaged(user.getRole().canAccessAssetDisposal());
 
-        printersCard.setVisible(user.getRole().canAccessPrinters());
-        printersCard.setManaged(user.getRole().canAccessPrinters());
+        technicalSupportCard.setVisible(user.getRole().canAccessTechnicalSupport());
+        technicalSupportCard.setManaged(user.getRole().canAccessTechnicalSupport());
+
+        usersCard.setVisible(user.getRole().canManageUsers());
+        usersCard.setManaged(user.getRole().canManageUsers());
     }
 
     @FXML
     private void onOpenCafeteria() {
         if (!SessionManager.getLoggedInUser().getRole().canAccessCafeteria()) {
-            AlertUtil.warning("Acesso negado", "Seu perfil nao tem acesso ao modulo Refeitorio.");
+            AlertUtil.warning("Acesso negado", "Seu perfil não tem acesso ao módulo Refeitório.");
             return;
         }
-        openScreen("/fxml/refeitorio.fxml", "Refeitorio - Harmonia");
+        openScreen("/fxml/refeitorio.fxml", "Refeitório - Harmonia");
     }
 
     @FXML
     private void onOpenAssetDisposal() {
         if (!SessionManager.getLoggedInUser().getRole().canAccessAssetDisposal()) {
-            AlertUtil.warning("Acesso negado", "Seu perfil nao tem acesso ao modulo Descarte de Ativos.");
+            AlertUtil.warning("Acesso negado", "Seu perfil não tem acesso ao módulo Descarte de Ativos.");
             return;
         }
         openScreen("/fxml/descarte_ativos.fxml", "Descarte de Ativos - Harmonia");
     }
 
     @FXML
-    private void onOpenPrinters() {
-        if (!SessionManager.getLoggedInUser().getRole().canAccessPrinters()) {
-            AlertUtil.warning("Acesso negado", "Seu perfil nao tem acesso ao modulo Impressoras.");
+    private void onOpenTechnicalSupport() {
+        if (!SessionManager.getLoggedInUser().getRole().canAccessTechnicalSupport()) {
+            AlertUtil.warning("Acesso negado", "Seu perfil não tem acesso ao módulo Assistência Técnica.");
             return;
         }
-        openScreen("/fxml/impressoras.fxml", "Impressoras - Harmonia");
+        openScreen("/fxml/assistencia_tecnica.fxml", "Assistência Técnica - Harmonia");
+    }
+
+    @FXML
+    private void onOpenUsers() {
+        if (!SessionManager.getLoggedInUser().getRole().canManageUsers()) {
+            AlertUtil.warning("Acesso negado", "Seu perfil não tem acesso ao gerenciamento de usuários.");
+            return;
+        }
+        openScreen("/fxml/usuarios.fxml", "Usuários - Harmonia");
     }
 
     @FXML
     private void onPreferences() {
-        openScreen("/fxml/preferencias.fxml", "Preferencias - Harmonia");
+        openScreen("/fxml/preferencias.fxml", "Preferências - Harmonia");
     }
 
     @FXML
     private void onAbout() {
-        AlertUtil.info("Sobre", "Harmonia - Sistema de Gestão v1.0.0\nModulos: Refeitório, Descarte de Ativos, Impressoras.");
+        AlertUtil.info("Sobre", "Harmonia - Sistema de Gestão v1.0.0\nMódulos: Refeitório, Descarte de Ativos, Assistência Técnica, Usuários.");
     }
 
     @FXML
@@ -105,7 +118,7 @@ public class HubController implements Initializable {
             App.openLoginWindow();
         } catch (IOException e) {
             log.error("Failed to return to the login screen after logout", e);
-            AlertUtil.error("Erro", "Nao foi possivel voltar para o login: " + e.getMessage());
+            AlertUtil.error("Erro", "Não foi possível voltar para o login: " + e.getMessage());
         }
     }
 
@@ -114,7 +127,7 @@ public class HubController implements Initializable {
             App.switchScene(fxml, title);
         } catch (IOException e) {
             log.error("Failed to open screen {}", fxml, e);
-            AlertUtil.error("Erro", "Nao foi possivel abrir a tela: " + e.getMessage());
+            AlertUtil.error("Erro", "Não foi possível abrir a tela: " + e.getMessage());
         }
     }
 
