@@ -46,8 +46,8 @@ public class ExternalAssetDaoImpl implements ExternalAssetDao {
         } catch (SQLException e) {
             log.error("Failed to query external asset database for assetTag={}", assetTagNumber, e);
             throw new DataAccessException(
-                "Erro ao consultar o banco de dados externo de patrimonio. " +
-                "Verifique a configuracao 'external.db.*' em db.properties e a disponibilidade da rede.", e);
+                "Erro ao consultar o banco de dados externo de patrimônio. " +
+                "Verifique a configuração 'external.db.*' em db.properties e a disponibilidade da rede.", e);
         }
     }
 }

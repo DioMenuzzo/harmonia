@@ -28,7 +28,7 @@ public class AssetDisposalController {
             App.switchScene("/fxml/hub.fxml", "Harmonia");
         } catch (IOException e) {
             log.error("Failed to navigate back to the hub", e);
-            AlertUtil.error("Erro", "Nao foi possivel voltar ao hub: " + e.getMessage());
+            AlertUtil.error("Erro", "Não foi possível voltar ao hub: " + e.getMessage());
         }
     }
 }

@@ -24,7 +24,7 @@
             <staticText>
                 <reportElement x="0" y="0" width="535" height="30"/>
                 <textElement textAlignment="Center"><font size="16" isBold="true"/></textElement>
-                <text><![CDATA[LAUDO TECNICO PARA AUTORIZACAO DE BAIXA PATRIMONIAL]]></text>
+                <text><![CDATA[LAUDO TÉCNICO PARA AUTORIZAÇÃO DE BAIXA PATRIMONIAL]]></text>
             </staticText>
             <textField pattern="dd/MM/yyyy">
                 <reportElement x="0" y="36" width="535" height="20"/>
@@ -39,7 +39,7 @@
             <staticText>
                 <reportElement x="0" y="0" width="200" height="18"/>
                 <textElement><font isBold="true"/></textElement>
-                <text><![CDATA[Numero de patrimonio:]]></text>
+                <text><![CDATA[Número de patrimônio:]]></text>
             </staticText>
             <textField>
                 <reportElement x="200" y="0" width="335" height="18"/>
@@ -49,7 +49,7 @@
             <staticText>
                 <reportElement x="0" y="24" width="200" height="18"/>
                 <textElement><font isBold="true"/></textElement>
-                <text><![CDATA[Descricao do ativo:]]></text>
+                <text><![CDATA[Descrição do ativo:]]></text>
             </staticText>
             <textField>
                 <reportElement x="200" y="24" width="335" height="18"/>
@@ -59,7 +59,7 @@
             <staticText>
                 <reportElement x="0" y="48" width="200" height="18"/>
                 <textElement><font isBold="true"/></textElement>
-                <text><![CDATA[Localizacao:]]></text>
+                <text><![CDATA[Localização:]]></text>
             </staticText>
             <textField>
                 <reportElement x="200" y="48" width="335" height="18"/>
@@ -69,7 +69,7 @@
             <staticText>
                 <reportElement x="0" y="72" width="200" height="18"/>
                 <textElement><font isBold="true"/></textElement>
-                <text><![CDATA[Data de aquisicao:]]></text>
+                <text><![CDATA[Data de aquisição:]]></text>
             </staticText>
             <textField pattern="dd/MM/yyyy">
                 <reportElement x="200" y="72" width="150" height="18"/>
@@ -79,7 +79,7 @@
             <staticText>
                 <reportElement x="0" y="96" width="200" height="18"/>
                 <textElement><font isBold="true"/></textElement>
-                <text><![CDATA[Valor de aquisicao:]]></text>
+                <text><![CDATA[Valor de aquisição:]]></text>
             </staticText>
             <textField>
                 <reportElement x="200" y="96" width="335" height="18"/>
@@ -100,7 +100,7 @@
             <staticText>
                 <reportElement x="0" y="230" width="535" height="18"/>
                 <textElement><font isBold="true"/></textElement>
-                <text><![CDATA[Parecer tecnico:]]></text>
+                <text><![CDATA[Parecer técnico:]]></text>
             </staticText>
             <textField isStretchWithOverflow="true">
                 <reportElement x="0" y="250" width="535" height="70"/>
@@ -111,7 +111,7 @@
             <staticText>
                 <reportElement x="0" y="340" width="200" height="18"/>
                 <textElement><font isBold="true"/></textElement>
-                <text><![CDATA[Situacao:]]></text>
+                <text><![CDATA[Situação:]]></text>
             </staticText>
             <textField>
                 <reportElement x="200" y="340" width="335" height="18"/>
@@ -124,7 +124,7 @@
             <textField>
                 <reportElement x="0" y="386" width="535" height="18"/>
                 <textElement textAlignment="Center"/>
-                <textFieldExpression><![CDATA["Responsavel tecnico: " + $F{technicalOfficer}]]></textFieldExpression>
+                <textFieldExpression><![CDATA["Responsável técnico: " + $F{technicalOfficer}]]></textFieldExpression>
             </textField>
         </band>
     </detail>

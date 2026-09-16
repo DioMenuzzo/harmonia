@@ -14,14 +14,14 @@
     <top>
         <HBox styleClass="top-bar" spacing="12" alignment="CENTER_LEFT">
             <Button text="◀ Voltar ao hub" onAction="#onBack"/>
-            <Label text="Modulo Descarte de Ativos" styleClass="top-bar-text"/>
+            <Label text="Módulo Descarte de Ativos" styleClass="top-bar-text"/>
         </HBox>
     </top>
 
     <center>
         <VBox alignment="CENTER" spacing="12">
-            <Label text="Modulo em construcao" styleClass="subtitle"/>
-            <Label text="A funcionalidade completa de Descarte de Ativos sera adicionada em uma proxima atualizacao."
+            <Label text="Módulo em construção" styleClass="subtitle"/>
+            <Label text="A funcionalidade completa de Descarte de Ativos será adicionada em uma próxima atualização."
                    wrapText="true" maxWidth="420" style="-fx-text-alignment: center;"/>
         </VBox>
     </center>

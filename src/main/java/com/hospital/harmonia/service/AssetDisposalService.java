@@ -47,13 +47,13 @@ public class AssetDisposalService {
 
     private void validate(AssetDisposalReport report) {
         if (report.getAssetTagNumber() == null || report.getAssetTagNumber().isBlank()) {
-            throw new IllegalArgumentException("Numero de patrimonio e obrigatorio.");
+            throw new IllegalArgumentException("Número de patrimônio é obrigatório.");
         }
         if (report.getDisposalReason() == null || report.getDisposalReason().isBlank()) {
-            throw new IllegalArgumentException("Motivo da baixa e obrigatorio.");
+            throw new IllegalArgumentException("Motivo da baixa é obrigatório.");
         }
         if (report.getTechnicalOfficer() == null || report.getTechnicalOfficer().isBlank()) {
-            throw new IllegalArgumentException("Responsavel tecnico e obrigatorio.");
+            throw new IllegalArgumentException("Responsável técnico é obrigatório.");
         }
     }
 }
