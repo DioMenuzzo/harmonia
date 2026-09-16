@@ -58,10 +58,10 @@ public class EmployeeService {
 
     private void validate(Employee e) {
         if (e.getName() == null || e.getName().isBlank()) {
-            throw new IllegalArgumentException("Nome do colaborador e obrigatorio.");
+            throw new IllegalArgumentException("Nome do colaborador é obrigatório.");
         }
         if (e.getRegistrationNumber() == null || e.getRegistrationNumber().isBlank()) {
-            throw new IllegalArgumentException("CPF do colaborador e obrigatorio.");
+            throw new IllegalArgumentException("CPF do colaborador é obrigatório.");
         }
     }
 }
