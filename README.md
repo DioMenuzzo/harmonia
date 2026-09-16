@@ -18,7 +18,7 @@ independent modules, gated by role-based access control:
 |---|---|---|
 | **Cafeteria** (Refeitorio) | Fully implemented | Registers contracted employees, logs their meals (type/price auto-derived from the time of day), configures meal prices, bulk-imports employees/meals from `.txt` files, and generates PDF spend reports per period. |
 | **Asset Disposal** (Descarte de Ativos) | Service layer implemented; screen is a placeholder | Looks up an asset in an external database, issues a technical disposal report, and exports it to PDF. |
-| **Printers** (Impressoras) | Service layer implemented; screen is a placeholder | Tracks printers sent out for repair, their warranty status and attachment, and their return. |
+| **Technical Support** (Assistência Técnica) | Fully implemented | Tracks any equipment (printers, notebooks, projectors, monitors, ...) sent out for repair, its warranty (in days) and attachment, and its return. Formerly a printers-only module ("Impressoras") -- generalized and renamed; the old printer-only classes were removed. |
 
 Every screen and every user-facing message is in Portuguese (the system's
 audience is Brazilian hospital staff); the codebase itself — class, method and
@@ -132,7 +132,7 @@ the application. Coverage today includes:
 - `AuthServiceTest` -- successful login, wrong password, unknown username.
 
 The same fake-DAO pattern can be extended to the remaining services
-(`PrinterService`, `AssetDisposalService`, `MealPriceService`, `UserService`)
+(`EquipmentService`, `AssetDisposalService`, `MealPriceService`, `UserService`)
 by adding the same package-private constructor to each.
 
 ## Error handling
@@ -163,7 +163,7 @@ src/main/java/com/hospital/harmonia/
   util/                       Password hashing, alerts, session, PDF reports
 
 src/main/resources/
-  fxml/          Screens (login, hub, cafeteria, asset disposal, printers, preferences)
+  fxml/          Screens (login, hub, cafeteria, asset disposal, technical support, preferences)
   css/           Visual styling
   reports/       JasperReports templates (.jrxml)
   db/            Database schema.sql
@@ -186,9 +186,9 @@ src/test/java/com/hospital/harmonia/
   named `cpf`, even though it holds an internal registration/badge number,
   not an actual CPF -- renaming that column is part of the same future
   migration.
-- The **Asset Disposal** and **Printers** screens are placeholders; their
-  service/DAO layers are fully implemented and tested at the persistence
-  level, only the JavaFX screen wiring is pending.
+- The **Asset Disposal** screen is a placeholder; its service/DAO layers are
+  fully implemented and tested at the persistence level, only the JavaFX
+  screen wiring is pending.
 - Locally attached files (profile photos, warranty attachments) are stored on
   the local filesystem (`fotos_perfil/`, `anexos_garantia/`); moving to
   shared storage (a network folder, or an S3/MinIO bucket) is recommended
