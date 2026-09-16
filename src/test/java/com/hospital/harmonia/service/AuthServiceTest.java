@@ -7,6 +7,7 @@ import com.hospital.harmonia.util.PasswordUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -62,6 +63,21 @@ class AuthServiceTest {
         @Override
         public void updateProfilePicture(int userId, String picturePath) {
             user.setProfilePicturePath(picturePath);
+        }
+
+        @Override
+        public List<User> findAll() {
+            return List.of(user);
+        }
+
+        @Override
+        public void updateUsername(int userId, String newUsername) {
+            user.setUsername(newUsername);
+        }
+
+        @Override
+        public void updatePasswordHash(int userId, String newPasswordHash) {
+            user.setPasswordHash(newPasswordHash);
         }
     }
 }

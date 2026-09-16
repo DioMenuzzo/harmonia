@@ -24,9 +24,14 @@ public enum Role {
         return this == FINANCEIRO || this == CIAU;
     }
 
-    public boolean canAccessPrinters() {
-        // Current rule: CIAU controls the printers module.
+    public boolean canAccessTechnicalSupport() {
+        // Current rule: CIAU controls the technical support (equipment repair) module.
         // Adjust here if another role also needs access.
+        return this == CIAU;
+    }
+
+    public boolean canManageUsers() {
+        // Current rule: only CIAU can change other accounts' username/password.
         return this == CIAU;
     }
 }

@@ -65,7 +65,7 @@ public class LoginController {
         String password = passwordField.getText();
 
         if (username.isEmpty() || password == null || password.isEmpty()) {
-            showError("Informe usuario e senha.");
+            showError("Informe usuário e senha.");
             return;
         }
 
@@ -77,13 +77,13 @@ public class LoginController {
             // created yet, etc. Previously this wasn't handled here: the error
             // wouldn't show on screen, it would just vanish (or fail silently).
             log.error("Failed to authenticate username={}", username, e);
-            showError("Nao foi possivel conectar ao banco de dados. Tente novamente em instantes.");
-            AlertUtil.error("Erro de conexao", "Nao foi possivel autenticar: " + e.getMessage());
+            showError("Não foi possível conectar ao banco de dados. Tente novamente em instantes.");
+            AlertUtil.error("Erro de conexão", "Não foi possível autenticar: " + e.getMessage());
             return;
         }
 
         if (result.isEmpty()) {
-            showError("Usuario ou senha invalidos.");
+            showError("Usuário ou senha inválidos.");
             passwordField.clear();
             return;
         }
@@ -98,7 +98,7 @@ public class LoginController {
             App.openHubInMainWindow();
         } catch (IOException e) {
             log.error("Failed to open the hub after login", e);
-            AlertUtil.error("Erro", "Nao foi possivel abrir a tela inicial: " + e.getMessage());
+            AlertUtil.error("Erro", "Não foi possível abrir a tela inicial: " + e.getMessage());
         }
     }
 

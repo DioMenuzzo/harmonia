@@ -32,7 +32,7 @@
     </VBox>
 
     <VBox spacing="8">
-        <Label text="Usuario logado" styleClass="subtitle"/>
+        <Label text="Usuário logado" styleClass="subtitle"/>
         <Label fx:id="userInfoLabel"/>
     </VBox>
 
