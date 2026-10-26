@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.CheckBox?>
+<?import javafx.scene.control.ComboBox?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.PasswordField?>
+<?import javafx.scene.control.ScrollPane?>
+<?import javafx.scene.control.Separator?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.BorderPane?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<BorderPane prefHeight="640.0" prefWidth="980.0" style="-fx-background-color: white;" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospital.harmonia.controller.UserManagementController">
+
+    <top>
+        <HBox alignment="CENTER_LEFT" spacing="12">
+            <padding>
+                <Insets top="16" right="24" bottom="8" left="24"/>
+            </padding>
+            <Button text="◀ Voltar" onAction="#onBack"/>
+            <Label text="Gerenciar Usuários" styleClass="title"/>
+        </HBox>
+    </top>
+
+    <center>
+        <HBox spacing="24">
+            <padding>
+                <Insets top="8" right="24" bottom="24" left="24"/>
+            </padding>
+
+            <VBox spacing="8" HBox.hgrow="ALWAYS">
+                <TableView fx:id="userTable" VBox.vgrow="ALWAYS">
+                    <columns>
+                        <TableColumn fx:id="usernameColumn" text="Usuário" prefWidth="140"/>
+                        <TableColumn fx:id="displayNameColumn" text="Nome de exibição" prefWidth="170"/>
+                        <TableColumn fx:id="roleColumn" text="Perfil" prefWidth="100"/>
+                        <TableColumn fx:id="activeColumn" text="Ativo" prefWidth="70"/>
+                    </columns>
+                </TableView>
+                <Label style="-fx-text-fill: #777777; -fx-font-size: 11px;" text="Selecione um usuário acima para editar credenciais ou inativar/ativar."/>
+                <HBox spacing="8">
+                    <Button onAction="#onDeactivateUser" text="INATIVAR" textFill="#c90000"/>
+                    <Button onAction="#onActivateUser" text="ATIVAR" textFill="#288d00"/>
+                </HBox>
+            </VBox>
+
+            <ScrollPane fitToWidth="true" prefWidth="300" style="-fx-background-color: transparent;">
+                <VBox prefWidth="285" spacing="24">
+                    <VBox spacing="10">
+                        <Label text="Editar credenciais" styleClass="subtitle"/>
+                        <Label fx:id="selectedUserLabel" wrapText="true"/>
+
+                        <Label text="Novo nome de usuário (opcional)"/>
+                        <TextField fx:id="newUsernameField"/>
+
+                        <Label text="Nova senha (opcional)"/>
+                        <PasswordField fx:id="newPasswordField"/>
+
+                        <Label text="Confirmar nova senha"/>
+                        <PasswordField fx:id="confirmPasswordField"/>
+
+                        <Button text="ATUALIZAR" styleClass="primary-button" stylesheets="@../css/styles.css" onAction="#onUpdateCredentials"/>
+                        <Label fx:id="statusLabel" wrapText="true"/>
+                    </VBox>
+
+                    <Separator/>
+
+                    <VBox spacing="10">
+                        <Label text="Permissões de acesso aos módulos" styleClass="subtitle" wrapText="true"/>
+                        <Label style="-fx-text-fill: #777777; -fx-font-size: 11px;"
+                               text="Selecione um usuário na tabela para editar o que ele pode acessar." wrapText="true"/>
+
+                        <CheckBox fx:id="permissionsCafeteriaCheck" disable="true" text="Refeitório"/>
+                        <CheckBox fx:id="permissionsAgendaCheck" disable="true" text="Agenda Telefônica"/>
+                        <CheckBox fx:id="permissionsTechnicalSupportCheck" disable="true" text="Assistência Técnica"/>
+
+                        <Button styleClass="primary-button" stylesheets="@../css/styles.css" text="SALVAR PERMISSÕES" onAction="#onSavePermissions"/>
+                        <Label fx:id="permissionsStatusLabel" wrapText="true"/>
+                    </VBox>
+
+                    <Separator/>
+
+                    <VBox spacing="10">
+                        <Label text="Novo usuário" styleClass="subtitle"/>
+
+                        <Label text="Nome de usuário"/>
+                        <TextField fx:id="registerUsernameField"/>
+
+                        <Label text="Nome de exibição"/>
+                        <TextField fx:id="registerDisplayNameField"/>
+
+                        <Label text="Perfil"/>
+                        <ComboBox fx:id="registerRoleCombo" maxWidth="Infinity" promptText="Selecione..."/>
+
+                        <Label text="Acesso aos módulos"/>
+                        <CheckBox fx:id="registerCafeteriaCheck" text="Refeitório"/>
+                        <CheckBox fx:id="registerAgendaCheck" text="Agenda Telefônica"/>
+                        <CheckBox fx:id="registerTechnicalSupportCheck" text="Assistência Técnica"/>
+                        <Label style="-fx-text-fill: #777777; -fx-font-size: 11px;"
+                               text="Escolher um Perfil acima já marca os módulos mais comuns -- ajuste como quiser antes de cadastrar." wrapText="true"/>
+
+                        <Label text="Senha"/>
+                        <PasswordField fx:id="registerPasswordField"/>
+
+                        <Label text="Confirmar senha"/>
+                        <PasswordField fx:id="registerConfirmPasswordField"/>
+
+                        <Button text="CADASTRAR" styleClass="primary-button" stylesheets="@../css/styles.css" onAction="#onRegisterUser"/>
+                        <Label fx:id="registerStatusLabel" wrapText="true"/>
+                    </VBox>
+                </VBox>
+            </ScrollPane>
+        </HBox>
+    </center>
+
+</BorderPane>

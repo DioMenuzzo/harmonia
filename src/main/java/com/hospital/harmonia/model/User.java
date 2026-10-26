@@ -9,6 +9,12 @@ public class User {
     private String displayName;
     private String profilePicturePath;
     private boolean active = true;
+    // Per-account module access -- see the comment on Role for why this
+    // replaced Role-based access. Each defaults to false (a brand-new account
+    // starts with no module until CIAU explicitly grants one).
+    private boolean accessCafeteria = false;
+    private boolean accessAgendaTelefonica = false;
+    private boolean accessTechnicalSupport = false;
 
     public User() {
     }
@@ -75,5 +81,29 @@ public class User {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public boolean isAccessCafeteria() {
+        return accessCafeteria;
+    }
+
+    public void setAccessCafeteria(boolean accessCafeteria) {
+        this.accessCafeteria = accessCafeteria;
+    }
+
+    public boolean isAccessAgendaTelefonica() {
+        return accessAgendaTelefonica;
+    }
+
+    public void setAccessAgendaTelefonica(boolean accessAgendaTelefonica) {
+        this.accessAgendaTelefonica = accessAgendaTelefonica;
+    }
+
+    public boolean isAccessTechnicalSupport() {
+        return accessTechnicalSupport;
+    }
+
+    public void setAccessTechnicalSupport(boolean accessTechnicalSupport) {
+        this.accessTechnicalSupport = accessTechnicalSupport;
     }
 }
