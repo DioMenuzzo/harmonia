@@ -6,9 +6,6 @@ import net.sf.jasperreports.engine.JasperFillManager;
 import net.sf.jasperreports.engine.JasperPrint;
 import net.sf.jasperreports.engine.JasperReport;
 import net.sf.jasperreports.engine.data.JRBeanCollectionDataSource;
-import net.sf.jasperreports.engine.export.HtmlExporter;
-import net.sf.jasperreports.export.SimpleExporterInput;
-import net.sf.jasperreports.export.SimpleHtmlExporterOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,26 +47,6 @@ public final class ReportGenerator {
             return outputFile;
         } catch (Exception e) {
             log.error("Failed to generate PDF report from {}", jrxmlResourcePath, e);
-            throw e;
-        }
-    }
-
-    public static <T> void generateHtml(String jrxmlResourcePath, Map<String, Object> parameters,
-                                         Collection<T> data, File outputFile) throws Exception {
-        log.info("Generating HTML report from {} ({} record(s)) -> {}",
-                jrxmlResourcePath, data.size(), outputFile.getAbsolutePath());
-        try (InputStream jrxmlStream = ReportGenerator.class.getResourceAsStream(jrxmlResourcePath)) {
-            JasperReport jasperReport = JasperCompileManager.compileReport(jrxmlStream);
-            JRBeanCollectionDataSource dataSource = new JRBeanCollectionDataSource(data);
-            JasperPrint jasperPrint = JasperFillManager.fillReport(jasperReport, parameters, dataSource);
-
-            HtmlExporter exporter = new HtmlExporter();
-            exporter.setExporterInput(new SimpleExporterInput(jasperPrint));
-            exporter.setExporterOutput(new SimpleHtmlExporterOutput(outputFile));
-            exporter.exportReport();
-            log.info("HTML report generated successfully: {}", outputFile.getAbsolutePath());
-        } catch (Exception e) {
-            log.error("Failed to generate HTML report from {}", jrxmlResourcePath, e);
             throw e;
         }
     }

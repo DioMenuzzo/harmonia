@@ -18,8 +18,18 @@ public class AssetDisposalService {
 
     private static final Logger log = LoggerFactory.getLogger(AssetDisposalService.class);
 
-    private final ExternalAssetDao externalAssetDao = new ExternalAssetDaoImpl();
-    private final AssetDisposalReportDao reportDao = new AssetDisposalReportDaoImpl();
+    private final ExternalAssetDao externalAssetDao;
+    private final AssetDisposalReportDao reportDao;
+
+    public AssetDisposalService() {
+        this(new ExternalAssetDaoImpl(), new AssetDisposalReportDaoImpl());
+    }
+
+    /** Package-visible constructor allowing test doubles to be injected (see AssetDisposalServiceTest). */
+    AssetDisposalService(ExternalAssetDao externalAssetDao, AssetDisposalReportDao reportDao) {
+        this.externalAssetDao = externalAssetDao;
+        this.reportDao = reportDao;
+    }
 
     /** Looks up the asset's data in the external database, to pre-fill the report. */
     public Optional<AssetDisposalReport> findAssetData(String assetTagNumber) {
@@ -32,7 +42,7 @@ public class AssetDisposalService {
         return reportDao.save(report);
     }
 
-    public List<AssetDisposalReport> listReports() {
+    public List<AssetDisposalReport> findAll() {
         return reportDao.findAll();
     }
 
