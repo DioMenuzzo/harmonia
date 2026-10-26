@@ -29,3 +29,8 @@ db.properties.local
 
 # Built installer -- a binary artifact, not source; don't version it.
 *.msi
+
+# Dados reais de contatos importados da planilha antiga -- nunca versionar
+src/main/resources/db/migrations/2026-10-19_agenda_importacao_contatos_legados.sql
+src/main/resources/db/migrations/2026-10-19b_agenda_padronizacao_contatos.sql
+src/main/resources/db/migrations/2026-10-19c_agenda_importacao_contatos_padronizados.sql
