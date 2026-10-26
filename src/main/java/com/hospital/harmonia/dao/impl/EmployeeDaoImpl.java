@@ -11,15 +11,19 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
-// NOTE: table/column names (colaboradores, nome, cpf, empresa_terceirizada,
-// cargo, ativo) are still the ones actually in the database -- only the
-// Java-side names were translated. Update these SQL strings together with the
-// database migration when that happens.
+// NOTE: table/column names (colaboradores, nome, cpf, cargo, ativo) are still
+// the ones actually in the database -- only the Java-side names were
+// translated. Update these SQL strings together with the database migration
+// when that happens.
+//
+// The category lives in its own table now ("categorias"), so what this DAO
+// writes is categoria_id and what it reads back is the joined name. The old
+// free-text column empresa_terceirizada is deliberately left untouched in the
+// database as a backup of the pre-migration values -- nothing here reads or
+// writes it any more, and it can be dropped once the migration is trusted.
 public class EmployeeDaoImpl implements EmployeeDao {
 
     private static final Logger log = LoggerFactory.getLogger(EmployeeDaoImpl.class);
@@ -28,15 +32,31 @@ public class EmployeeDaoImpl implements EmployeeDao {
     // https://www.postgresql.org/docs/current/errcodes-appendix.html
     private static final String SQLSTATE_UNIQUE_VIOLATION = "23505";
 
+    // LEFT JOIN (not INNER): an employee with no category must still be
+    // listed, with categoria_nome coming back NULL.
+    private static final String SELECT_WITH_CATEGORY =
+            "SELECT c.*, cat.nome AS categoria_nome FROM colaboradores c " +
+            "LEFT JOIN categorias cat ON cat.id = c.categoria_id";
+
+    /** Writes the category link, or SQL NULL when the employee has no category assigned. */
+    private static void setCategoryId(PreparedStatement stmt, int parameterIndex, Integer categoryId)
+            throws SQLException {
+        if (categoryId == null) {
+            stmt.setNull(parameterIndex, java.sql.Types.INTEGER);
+        } else {
+            stmt.setInt(parameterIndex, categoryId);
+        }
+    }
+
     @Override
     public Employee save(Employee e) {
-        String sql = "INSERT INTO colaboradores (nome, cpf, empresa_terceirizada, cargo, uso_compartilhado, ativo) " +
+        String sql = "INSERT INTO colaboradores (nome, cpf, categoria_id, cargo, uso_compartilhado, ativo) " +
                 "VALUES (?, ?, ?, ?, ?, TRUE) RETURNING id";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, e.getName());
             stmt.setString(2, e.getRegistrationNumber());
-            stmt.setString(3, e.getCategory());
+            setCategoryId(stmt, 3, e.getCategoryId());
             stmt.setString(4, e.getJobTitle());
             stmt.setBoolean(5, e.isSharedUsage());
             try (ResultSet rs = stmt.executeQuery()) {
@@ -59,7 +79,7 @@ public class EmployeeDaoImpl implements EmployeeDao {
 
     @Override
     public Optional<Employee> findById(int id) {
-        String sql = "SELECT * FROM colaboradores WHERE id = ?";
+        String sql = SELECT_WITH_CATEGORY + " WHERE c.id = ?";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setInt(1, id);
@@ -74,7 +94,7 @@ public class EmployeeDaoImpl implements EmployeeDao {
 
     @Override
     public Optional<Employee> findByRegistrationNumber(String registrationNumber) {
-        String sql = "SELECT * FROM colaboradores WHERE cpf = ?";
+        String sql = SELECT_WITH_CATEGORY + " WHERE c.cpf = ?";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, registrationNumber);
@@ -89,38 +109,28 @@ public class EmployeeDaoImpl implements EmployeeDao {
 
     @Override
     public List<Employee> findAll() {
-        return list("SELECT * FROM colaboradores ORDER BY nome");
+        return list(SELECT_WITH_CATEGORY + " ORDER BY c.nome");
     }
 
     @Override
     public List<Employee> findActive() {
-        return list("SELECT * FROM colaboradores WHERE ativo = TRUE ORDER BY nome");
+        return list(SELECT_WITH_CATEGORY + " WHERE c.ativo = TRUE ORDER BY c.nome");
     }
 
     private List<Employee> list(String sql) {
-        List<Employee> result = new ArrayList<>();
-        try (Connection conn = DatabaseConfig.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-            while (rs.next()) {
-                result.add(map(rs));
-            }
-            return result;
-        } catch (SQLException e) {
-            log.error("Failed to list employees", e);
-            throw new DataAccessException("Erro ao listar colaboradores", e);
-        }
+        return JdbcListSupport.queryList(log, sql, this::map,
+                "Failed to list employees", "Erro ao listar colaboradores");
     }
 
     @Override
     public void update(Employee e) {
-        String sql = "UPDATE colaboradores SET nome = ?, cpf = ?, empresa_terceirizada = ?, cargo = ?, " +
+        String sql = "UPDATE colaboradores SET nome = ?, cpf = ?, categoria_id = ?, cargo = ?, " +
                 "uso_compartilhado = ?, ativo = ? WHERE id = ?";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, e.getName());
             stmt.setString(2, e.getRegistrationNumber());
-            stmt.setString(3, e.getCategory());
+            setCategoryId(stmt, 3, e.getCategoryId());
             stmt.setString(4, e.getJobTitle());
             stmt.setBoolean(5, e.isSharedUsage());
             stmt.setBoolean(6, e.isActive());
@@ -174,7 +184,11 @@ public class EmployeeDaoImpl implements EmployeeDao {
         e.setId(rs.getInt("id"));
         e.setName(rs.getString("nome"));
         e.setRegistrationNumber(rs.getString("cpf"));
-        e.setCategory(rs.getString("empresa_terceirizada"));
+        // getInt returns 0 for SQL NULL, so wasNull() is what tells an
+        // employee with no category apart from one linked to category id 0.
+        int categoryId = rs.getInt("categoria_id");
+        e.setCategoryId(rs.wasNull() ? null : categoryId);
+        e.setCategoryName(rs.getString("categoria_nome"));
         e.setJobTitle(rs.getString("cargo"));
         e.setSharedUsage(rs.getBoolean("uso_compartilhado"));
         e.setActive(rs.getBoolean("ativo"));
