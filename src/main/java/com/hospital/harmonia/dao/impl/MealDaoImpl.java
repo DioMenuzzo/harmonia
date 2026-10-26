@@ -121,10 +121,11 @@ public class MealDaoImpl implements MealDao {
     public List<Meal> findByPeriod(LocalDate start, LocalDate end) {
         // Brings back active AND inactive -- this list feeds the screen's
         // table/audit log, so it needs to show everything registered in the period.
-        String sql = "SELECT r.*, c.nome AS nome_colaborador, c.empresa_terceirizada AS categoria_colaborador, " +
+        String sql = "SELECT r.*, c.nome AS nome_colaborador, cat.nome AS categoria_colaborador, " +
                 "c.uso_compartilhado AS colaborador_compartilhado " +
                 "FROM refeicoes r " +
                 "JOIN colaboradores c ON c.id = r.colaborador_id " +
+                "LEFT JOIN categorias cat ON cat.id = c.categoria_id " +
                 "WHERE r.data BETWEEN ? AND ? ORDER BY r.data, r.horario";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -141,10 +142,11 @@ public class MealDaoImpl implements MealDao {
     public List<Meal> findActiveByPeriod(LocalDate start, LocalDate end) {
         // Used in the PDF report and in the total spent calculation -- deactivated
         // (canceled) meals must not enter the billing nor the report.
-        String sql = "SELECT r.*, c.nome AS nome_colaborador, c.empresa_terceirizada AS categoria_colaborador, " +
+        String sql = "SELECT r.*, c.nome AS nome_colaborador, cat.nome AS categoria_colaborador, " +
                 "c.uso_compartilhado AS colaborador_compartilhado " +
                 "FROM refeicoes r " +
                 "JOIN colaboradores c ON c.id = r.colaborador_id " +
+                "LEFT JOIN categorias cat ON cat.id = c.categoria_id " +
                 "WHERE r.ativo = TRUE AND r.data BETWEEN ? AND ? ORDER BY r.data, r.horario";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -159,10 +161,11 @@ public class MealDaoImpl implements MealDao {
 
     @Override
     public List<Meal> findByEmployeeAndPeriod(int employeeId, LocalDate start, LocalDate end) {
-        String sql = "SELECT r.*, c.nome AS nome_colaborador, c.empresa_terceirizada AS categoria_colaborador, " +
+        String sql = "SELECT r.*, c.nome AS nome_colaborador, cat.nome AS categoria_colaborador, " +
                 "c.uso_compartilhado AS colaborador_compartilhado " +
                 "FROM refeicoes r " +
                 "JOIN colaboradores c ON c.id = r.colaborador_id " +
+                "LEFT JOIN categorias cat ON cat.id = c.categoria_id " +
                 "WHERE r.colaborador_id = ? AND r.data BETWEEN ? AND ? ORDER BY r.data, r.horario";
         try (Connection conn = DatabaseConfig.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
