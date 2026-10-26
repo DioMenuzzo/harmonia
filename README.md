@@ -1,7 +1,7 @@
 # Harmonia
 
 A modular desktop management system built for a hospital's cafeteria, IT asset
-disposal, and printer maintenance workflows.
+disposal, equipment technical-support, and internal phone-directory workflows.
 
 **Stack:** Java 17 · JavaFX 21 · PostgreSQL · JasperReports · HikariCP · Maven
 
@@ -11,14 +11,19 @@ disposal, and printer maintenance workflows.
 
 ## Overview
 
-Harmonia is a single-workstation JavaFX desktop application with three
-independent modules, gated by role-based access control:
+Harmonia is a single-workstation JavaFX desktop application with four
+independent modules, each gated by a per-account access flag (see
+**Access control** below):
 
 | Module | Status | What it does |
 |---|---|---|
-| **Cafeteria** (Refeitorio) | Fully implemented | Registers contracted employees, logs their meals (type/price auto-derived from the time of day), configures meal prices, bulk-imports employees/meals from `.txt` files, and generates PDF spend reports per period. |
-| **Asset Disposal** (Descarte de Ativos) | Service layer implemented; screen is a placeholder | Looks up an asset in an external database, issues a technical disposal report, and exports it to PDF. |
+| **Cafeteria** (Refeitorio) | Fully implemented | Registers contracted employees (grouped by a dedicated category registry), logs their meals (type/price auto-derived from the time of day), configures meal prices, bulk-imports employees/meals from `.txt` files, and generates PDF and XLSX spend reports per period, filterable by category, meal type and employee. |
 | **Technical Support** (Assistência Técnica) | Fully implemented | Tracks any equipment (printers, notebooks, projectors, monitors, ...) sent out for repair, its warranty (in days) and attachment, and its return. Formerly a printers-only module ("Impressoras") -- generalized and renamed; the old printer-only classes were removed. |
+| **Phone Directory** (Agenda Telefônica) | Fully implemented | Hospital sectors, doctors, partner institutions, ambulance/transport services and any other useful phone number, with its own category registry. Replaces the standalone "Agenda v2.0" Excel spreadsheet the front desk used before. |
+| **Asset Disposal** (Descarte de Ativos) | Service layer implemented; screen is a placeholder | Looks up an asset in an external database, issues a technical disposal report, and exports it to PDF. |
+
+There is also a **Gerenciar Usuários** screen (CIAU accounts only) for
+creating accounts and editing which of the four modules each one can open.
 
 Every screen and every user-facing message is in Portuguese (the system's
 audience is Brazilian hospital staff); the codebase itself — class, method and
@@ -49,6 +54,25 @@ A request flows one direction only: `controller -> service -> dao -> database`.
 Controllers never touch JDBC directly, and DAOs never contain business rules
 -- this is what makes the service layer unit-testable without a database (see
 **Testing** below).
+
+Both the Cafeteria's employee categories and the Phone Directory's contact
+categories are backed by their own registry table (`categorias` /
+`categorias_agenda`), picked from a dropdown instead of typed as free text --
+this is what keeps "Alunos", "ALUNOS" and "Alunos " from becoming three
+different groups on a billing report or a contact list.
+
+## Access control
+
+Each account (`usuarios`) has three independent flags --
+`acesso_refeitorio`, `acesso_agenda_telefonica` and
+`acesso_assistencia_tecnica` -- editable per account on the **Gerenciar
+Usuários** screen. `perfil` (RH/FINANCEIRO/CIAU) no longer determines module
+access by itself the way it originally did; it now only labels the account
+(shown in the users table) and gates the Gerenciar Usuários screen itself,
+which stays role-based and CIAU-only on purpose -- it is the screen that
+hands out every other permission, so letting it be self/other-granted
+through the same checkbox list it controls would be a privilege-escalation
+hole.
 
 ## Prerequisites
 
@@ -95,14 +119,25 @@ mvn javafx:run
 Alternatively, `mvn package` produces a self-contained "fat jar"
 (`target/harmonia.jar`, via `maven-shade-plugin`) that can be run directly
 with `java -jar target/harmonia.jar` on any machine with a JDK 17+ and no
-Maven installed.
+Maven installed. An optional `mvn package -Ppackage-msi` profile builds a
+Windows `.msi` installer instead (requires the WiX Toolset v3 -- see the
+comment on that profile in `pom.xml`).
+
+`src/main/resources/db/migrations/` has the one-off SQL scripts for bringing
+an existing database up to date with a schema change that isn't covered by
+`schema.sql`'s own `CREATE TABLE IF NOT EXISTS` statements (e.g. a new column
+on a table that already exists). Run whichever ones apply to your database,
+in date order; each one documents, in its own header comment, what it does
+and whether it's safe to run more than once.
 
 ## Logging
 
 Logging uses **SLF4J + Logback** (`src/main/resources/logback.xml`). Every
 DAO, service and controller logs through it instead of `System.out`/
 `printStackTrace`, so operational history is always available even though the
-UI only ever shows the user a short, friendly message.
+UI only ever shows the user a short, friendly message. An uncaught exception
+on any thread is also caught globally (`App.handleUncaughtException`) and
+shown as a Portuguese alert instead of failing silently.
 
 - Console output while developing (`mvn javafx:run` / running from the IDE).
 - `logs/harmonia.log`, rotated daily and at 10MB, 30 days of history kept --
@@ -119,21 +154,28 @@ mvn test
 
 The test suite (`src/test/java`) targets the **service layer** with plain
 JUnit 5, using small hand-written in-memory fakes of the DAO interfaces
-instead of a real database connection -- this is why `EmployeeService`,
-`MealService` and `AuthService` expose a package-private constructor that
-accepts a DAO, alongside their normal no-arg constructor used by the rest of
-the application. Coverage today includes:
+instead of a real database connection -- this is why most services expose a
+package-private constructor that accepts a DAO, alongside their normal no-arg
+constructor used by the rest of the application. Coverage today includes:
 
 - `MealTypeTest` -- the cafeteria's operating-hours boundaries (`byTime`).
 - `PasswordUtilTest` -- password hashing/verification, including
   null-safety and a corrupted-hash edge case.
-- `EmployeeServiceTest`, `MealServiceTest` -- input validation and the
-  total-spent calculation.
+- `EmployeeServiceTest`, `MealServiceTest`, `MealPriceServiceTest` -- input
+  validation, the total-spent calculation, and price configuration.
 - `AuthServiceTest` -- successful login, wrong password, unknown username.
+- `CategoryServiceTest` -- the category registry shared by employees.
+- `EquipmentServiceTest` -- Assistência Técnica's validation rules.
+- `UserServiceTest` -- account registration and per-module permission updates.
+- `AssetDisposalServiceTest` -- report generation against the external asset
+  lookup, ahead of the screen itself being implemented (see **Known
+  limitations** below).
 
-The same fake-DAO pattern can be extended to the remaining services
-(`EquipmentService`, `AssetDisposalService`, `MealPriceService`, `UserService`)
-by adding the same package-private constructor to each.
+Not yet covered: any controller, any DAO implementation (the tests above use
+fakes, so the real SQL is never exercised by an automated test), and the
+Phone Directory's `ContactService`/`ContactCategoryService`, and
+`ReportFilters`. The same fake-DAO pattern used above can be extended to
+those.
 
 ## Error handling
 
@@ -156,17 +198,18 @@ by adding the same package-private constructor to each.
 src/main/java/com/hospital/harmonia/
   App.java, Launcher.java     JavaFX application bootstrap
   config/                     Database connection pooling (HikariCP)
-  model/                      Entities and enums (Employee, Meal, User, ...)
+  model/                      Entities and enums (Employee, Meal, Contact, User, ...)
   dao/ and dao/impl/          Data access (plain JDBC)
   service/                    Business rules and validation
   controller/                 JavaFX FXML screen controllers
-  util/                       Password hashing, alerts, session, PDF reports
+  util/                       Password hashing, alerts, session, PDF/XLSX reports
 
 src/main/resources/
-  fxml/          Screens (login, hub, cafeteria, asset disposal, technical support, preferences)
+  fxml/          Screens (login, hub, cafeteria, technical support, phone
+                 directory, asset disposal, user management, preferences)
   css/           Visual styling
   reports/       JasperReports templates (.jrxml)
-  db/            Database schema.sql
+  db/            schema.sql, plus one-off migration scripts in migrations/
   images/        Icons and default images
   logback.xml    Logging configuration
 
@@ -187,9 +230,19 @@ src/test/java/com/hospital/harmonia/
   not an actual CPF -- renaming that column is part of the same future
   migration.
 - The **Asset Disposal** screen is a placeholder; its service/DAO layers are
-  fully implemented and tested at the persistence level, only the JavaFX
-  screen wiring is pending.
+  fully implemented and tested at the persistence level (see
+  `AssetDisposalServiceTest`), only the JavaFX screen wiring is pending.
 - Locally attached files (profile photos, warranty attachments) are stored on
-  the local filesystem (`fotos_perfil/`, `anexos_garantia/`); moving to
+  the local filesystem (`fotos_perfil/`, `anexos_impressoras/`); moving to
   shared storage (a network folder, or an S3/MinIO bucket) is recommended
   before running this on more than one workstation.
+- **Schema migrations are plain SQL scripts**, applied by hand in date order
+  (see **Running** above) -- there's no Flyway/Liquibase-style tracking of
+  which migration already ran against which database. Fine for a single
+  production database with one person applying changes; worth revisiting if
+  that stops being true.
+- The Phone Directory's ~5,100 legacy contacts (from the old "Agenda v2.0"
+  spreadsheet) were imported directly against the production database; the
+  import/standardization scripts are intentionally **not** committed to this
+  repository, since they contain real contact data (names, phone numbers) for
+  people and institutions tied to the hospital.
