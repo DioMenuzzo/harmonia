@@ -10,7 +10,7 @@
     <packaging>jar</packaging>
 
     <name>Harmonia</name>
-    <description>Sistema modular: Refeitorio, Descarte de Ativos e Impressoras</description>
+    <description>Sistema modular: Refeitorio, Descarte de Ativos e Assistencia Tecnica</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -21,7 +21,7 @@
         <postgres.version>42.7.3</postgres.version>
         <jasper.version>6.21.3</jasper.version>
 
-        <!-- Classe principal (launcher). Ver util/Launcher.java -->
+        <!-- Main class (launcher). See util/Launcher.java -->
         <mainClass>com.hospital.harmonia.Launcher</mainClass>
     </properties>
 
@@ -44,6 +44,15 @@
             <version>${javafx.version}</version>
         </dependency>
 
+        <!-- ============ ControlsFX (extra JavaFX controls; used by the
+             CheckComboBox in the Category/Type filters on the Cafeteria
+             report, which allow selecting several values at once) ============ -->
+        <dependency>
+            <groupId>org.controlsfx</groupId>
+            <artifactId>controlsfx</artifactId>
+            <version>11.2.1</version>
+        </dependency>
+
         <!-- ============ PostgreSQL JDBC Driver ============ -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -51,7 +60,7 @@
             <version>${postgres.version}</version>
         </dependency>
 
-        <!-- ============ Pool de conexoes (recomendado p/ producao) ============ -->
+        <!-- ============ Connection pool (recommended for production) ============ -->
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
@@ -70,14 +79,14 @@
             <version>${jasper.version}</version>
         </dependency>
 
-        <!-- ============ Geracao de planilhas Excel (relatorio .xlsx) ============ -->
+        <!-- ============ Excel spreadsheet generation (.xlsx report) ============ -->
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
             <version>5.2.5</version>
         </dependency>
 
-        <!-- ============ Hash de senha (BCrypt) ============ -->
+        <!-- ============ Password hashing (BCrypt) ============ -->
         <dependency>
             <groupId>org.mindrot</groupId>
             <artifactId>jbcrypt</artifactId>
@@ -119,7 +128,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Plugin para rodar o app JavaFX direto pelo Maven: mvn javafx:run -->
+            <!-- Plugin to run the JavaFX app directly through Maven: mvn javafx:run -->
             <plugin>
                 <groupId>org.openjfx</groupId>
                 <artifactId>javafx-maven-plugin</artifactId>
@@ -130,7 +139,7 @@
                 </configuration>
             </plugin>
 
-            <!-- Gera um JAR "fat jar" com todas as dependencias, para distribuir o programa pronto -->
+            <!-- Builds a "fat jar" with all dependencies, to distribute the finished program -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
@@ -146,10 +155,11 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>${mainClass}</mainClass>
                                 </transformer>
-                                <!-- Necessario para o Apache POI (relatorio .xlsx): varias bibliotecas
-                                     dentro dele registram servicos no mesmo arquivo em META-INF/services,
-                                     e sem isso o maven-shade-plugin mantém so o ultimo, quebrando em
-                                     tempo de execucao. Este transformer faz a mesclagem (merge) correta. -->
+                                <!-- Needed for Apache POI (.xlsx report): several libraries inside
+                                     it register services in the same META-INF/services file, and
+                                     without this the maven-shade-plugin keeps only the last one,
+                                     breaking things at runtime. This transformer does the correct
+                                     merge. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                             </transformers>
                         </configuration>
@@ -159,5 +169,81 @@
 
         </plugins>
     </build>
+
+    <!-- =====================================================================
+         PROFILE: package-msi
+         Builds a real Windows installer (.msi) from the fat jar, ready to be
+         pushed by the GPO Software Installation policy discussed with
+         Giovani (2026-09-18); this profile doesn't run on a normal
+         "mvn package"; it's a separate, explicit step:
+
+             mvn package -Ppackage-msi
+
+         Prerequisites on whichever machine builds the installer:
+           - JDK 17+ (jpackage ships inside the JDK itself, nothing extra to
+             install for that part).
+           - WiX Toolset v3 (https://wixtoolset.org/): jpackage's Windows
+             "msi" type shells out to WiX (candle.exe/light.exe) to actually
+             build the .msi. Without it, this profile fails with an error
+             naming "WiX Tools".
+
+         IMPORTANT for GPO upgrades to work: <winUpgradeUuid> below must
+         NEVER change between releases; it's what tells Windows Installer
+         (and therefore the GPO Software Installation "Upgrades" tab) that a
+         new .msi is a newer version of the SAME product, instead of an
+         unrelated program. Only <version> above (top of this file) should
+         change from one release to the next; bump it before each
+         package-msi build (e.g. 1.0.0 -> 1.1.0).
+         ===================================================================== -->
+    <profiles>
+        <profile>
+            <id>package-msi</id>
+            <properties>
+                <!-- Placeholder: replace with the hospital/department name
+                     that should show up in "Add or Remove Programs". -->
+                <jpackage.vendor>Hospital</jpackage.vendor>
+            </properties>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.panteleyev</groupId>
+                        <artifactId>jpackage-maven-plugin</artifactId>
+                        <version>1.6.0</version>
+                        <executions>
+                            <execution>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>jpackage</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <name>Harmonia</name>
+                            <appVersion>${project.version}</appVersion>
+                            <vendor>${jpackage.vendor}</vendor>
+                            <destination>target/dist</destination>
+                            <input>target</input>
+                            <mainJar>${project.build.finalName}.jar</mainJar>
+                            <mainClass>${mainClass}</mainClass>
+                            <!-- Optional: point this at a .ico version of
+                                 src/main/resources/images/app-icon.png once one
+                                 exists (jpackage on Windows needs .ico, not
+                                 .png); safe to leave commented out for now,
+                                 jpackage just falls back to a default icon. -->
+                            <!-- <icon>src/main/resources/images/app-icon.ico</icon> -->
+                            <type>MSI</type>
+                            <winMenu>true</winMenu>
+                            <winShortcut>true</winShortcut>
+                            <winDirChooser>false</winDirChooser>
+                            <!-- Fixed on purpose, see the note above. Generated
+                                 once with `python3 -c "import uuid; print(uuid.uuid4())"`
+                                 on 2026-09-18; never regenerate this. -->
+                            <winUpgradeUuid>6F6BA38F-3F89-4AD7-A5EE-65F833EFF07B</winUpgradeUuid>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>
