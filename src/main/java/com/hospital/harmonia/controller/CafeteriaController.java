@@ -1,14 +1,19 @@
 package com.hospital.harmonia.controller;
 
 import com.hospital.harmonia.App;
+import com.hospital.harmonia.model.Category;
 import com.hospital.harmonia.model.Employee;
 import com.hospital.harmonia.model.Meal;
 import com.hospital.harmonia.model.MealType;
 import com.hospital.harmonia.service.DuplicateMealException;
+import com.hospital.harmonia.service.CategoryService;
 import com.hospital.harmonia.service.EmployeeService;
 import com.hospital.harmonia.service.MealPriceService;
 import com.hospital.harmonia.service.MealService;
+import com.hospital.harmonia.service.ReportFilters;
 import com.hospital.harmonia.util.AlertUtil;
+import com.hospital.harmonia.util.FormUtil;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.collections.transformation.FilteredList;
@@ -18,6 +23,7 @@ import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.stage.FileChooser;
 import javafx.util.StringConverter;
+import org.controlsfx.control.CheckComboBox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,10 +33,10 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -39,10 +45,13 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class CafeteriaController implements Initializable {
 
@@ -51,7 +60,15 @@ public class CafeteriaController implements Initializable {
     // --- Employees tab ---
     @FXML private TextField employeeNameField;
     @FXML private TextField employeeRegistrationField;
-    @FXML private TextField employeeCategoryField;
+    @FXML private ComboBox<Category> employeeCategoryCombo;
+
+    // --- Categorias tab ---
+    @FXML private TableView<Category> categoryTable;
+    @FXML private TableColumn<Category, String> categoryNameColumn;
+    @FXML private TableColumn<Category, String> categoryEmployeeCountColumn;
+    @FXML private TableColumn<Category, String> categoryActiveColumn;
+    @FXML private TextField categoryNameField;
+    @FXML private Button saveCategoryButton;
     // Marks a matrícula as intentionally shared by more than one person (see
     // Employee.sharedUsage) -- e.g. a "plantão médico" badge. When checked,
     // the one-meal-per-type-per-day rule doesn't apply to this employee.
@@ -88,8 +105,10 @@ public class CafeteriaController implements Initializable {
     // --- Reports tab ---
     @FXML private DatePicker reportStartDatePicker;
     @FXML private DatePicker reportEndDatePicker;
-    @FXML private ComboBox<String> reportCategoryCombo;
-    @FXML private ComboBox<MealType> reportTypeCombo;
+    @FXML private CheckComboBox<String> reportCategoryCombo;
+    @FXML private CheckBox reportCategoryExcludeCheck;
+    @FXML private CheckComboBox<MealType> reportTypeCombo;
+    @FXML private CheckBox reportTypeExcludeCheck;
     @FXML private ComboBox<Employee> reportEmployeeCombo;
     @FXML private Label reportStatusLabel;
     @FXML private TextField breakfastPriceField;
@@ -99,10 +118,12 @@ public class CafeteriaController implements Initializable {
     @FXML private Label priceStatusLabel;
 
     private final EmployeeService employeeService = new EmployeeService();
+    private final CategoryService categoryService = new CategoryService();
     private final MealService mealService = new MealService();
     private final MealPriceService mealPriceService = new MealPriceService();
 
     private final ObservableList<Employee> employees = FXCollections.observableArrayList();
+    private final ObservableList<Category> categories = FXCollections.observableArrayList();
     private final ObservableList<Meal> meals = FXCollections.observableArrayList();
 
     // List of active employees used by the search combo in the "Meals" tab,
@@ -133,6 +154,7 @@ public class CafeteriaController implements Initializable {
     // -- it must be preserved on update, otherwise an inactive employee would
     // become active again (or vice-versa) without the user asking for it.
     private Integer editingEmployeeId;
+    private Integer editingCategoryId;
     private boolean editingEmployeeActive;
     // "Job title" no longer has a field on the form (removed by the user), but
     // the column still exists in the database -- keep the original value so it
@@ -152,14 +174,12 @@ public class CafeteriaController implements Initializable {
     // meal itself (already denormalized via the query's JOIN) when editing starts.
     private boolean editingMealOriginalSharedUsage;
 
-    // Fixed date format (day/month/year) used in the DatePickers on screen --
-    // independent of the machine's locale (see configureDatePickers).
-    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
-
     @Override
     public void initialize(URL location, ResourceBundle resources) {
         configureEmployeeTable();
         configureEmployeeFilters();
+        configureCategoryTable();
+        configureEmployeeCategoryCombo();
         configureMealTable();
         configureMealFilters();
         configureEmployeeCombo();
@@ -167,6 +187,10 @@ public class CafeteriaController implements Initializable {
         configureDatePickers();
         configureTimeField();
 
+        // Before loadEmployees(): the employee table and the report filters
+        // both display category names, and the employee form's dropdown needs
+        // its options in place.
+        loadCategories();
         loadEmployees();
         // By default, show the current week in the registration/report views
         LocalDate today = LocalDate.now();
@@ -188,27 +212,9 @@ public class CafeteriaController implements Initializable {
      * picker on screen (Meals and Reports), regardless of the system's locale.
      */
     private void configureDatePickers() {
-        configureDateFormat(mealDatePicker);
-        configureDateFormat(reportStartDatePicker);
-        configureDateFormat(reportEndDatePicker);
-    }
-
-    private static void configureDateFormat(DatePicker datePicker) {
-        datePicker.setPromptText("dd/mm/aaaa");
-        datePicker.setConverter(new StringConverter<LocalDate>() {
-            @Override
-            public String toString(LocalDate date) {
-                return date == null ? "" : DATE_FORMAT.format(date);
-            }
-
-            @Override
-            public LocalDate fromString(String text) {
-                if (text == null || text.isBlank()) {
-                    return null;
-                }
-                return LocalDate.parse(text.trim(), DATE_FORMAT);
-            }
-        });
+        FormUtil.configureDateFormat(mealDatePicker);
+        FormUtil.configureDateFormat(reportStartDatePicker);
+        FormUtil.configureDateFormat(reportEndDatePicker);
     }
 
     // Internal-only guard to prevent the field's own reformatting
@@ -255,10 +261,10 @@ public class CafeteriaController implements Initializable {
     private void configureEmployeeTable() {
         nameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
         registrationColumn.setCellValueFactory(new PropertyValueFactory<>("registrationNumber"));
-        categoryColumn.setCellValueFactory(new PropertyValueFactory<>("category"));
-        sharedUsageColumn.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
+        categoryColumn.setCellValueFactory(new PropertyValueFactory<>("categoryName"));
+        sharedUsageColumn.setCellValueFactory(data -> new SimpleStringProperty(
                 data.getValue().isSharedUsage() ? "SIM" : "NÃO"));
-        activeColumn.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
+        activeColumn.setCellValueFactory(data -> new SimpleStringProperty(
                 data.getValue().isActive() ? "SIM" : "NÃO"));
         filteredEmployeesForTable = new FilteredList<>(employees, e -> true);
         employeeTable.setItems(filteredEmployeesForTable);
@@ -298,6 +304,11 @@ public class CafeteriaController implements Initializable {
         // list (and what shows up in the dropdown) updates itself.
         activeEmployees.setAll(employeeService.findActive());
         refreshReportFilterOptions();
+        // The "colaboradores" column counts from this very list, so it has to
+        // be redrawn whenever the list changes.
+        if (categoryTable != null) {
+            categoryTable.refresh();
+        }
     }
 
     /**
@@ -317,22 +328,18 @@ public class CafeteriaController implements Initializable {
     }
 
     private void applyEmployeeFilter() {
-        String name = normalize(employeeFilterNameField.getText());
-        String category = normalize(employeeFilterCategoryField.getText());
-        String registration = orEmpty(employeeFilterRegistrationField.getText()).trim();
+        String name = FormUtil.normalize(employeeFilterNameField.getText());
+        String category = FormUtil.normalize(employeeFilterCategoryField.getText());
+        String registration = FormUtil.orEmpty(employeeFilterRegistrationField.getText()).trim();
         String status = employeeFilterStatusCombo.getValue();
 
         filteredEmployeesForTable.setPredicate(e ->
-                (name.isEmpty() || normalize(e.getName()).contains(name))
-                        && (category.isEmpty() || normalize(orEmpty(e.getCategory())).contains(category))
-                        && (registration.isEmpty() || orEmpty(e.getRegistrationNumber()).contains(registration))
+                (name.isEmpty() || FormUtil.normalize(e.getName()).contains(name))
+                        && (category.isEmpty() || FormUtil.normalize(FormUtil.orEmpty(e.getCategoryName())).contains(category))
+                        && (registration.isEmpty() || FormUtil.orEmpty(e.getRegistrationNumber()).contains(registration))
                         && ("Todos".equals(status)
                                 || ("Ativos".equals(status) && e.isActive())
                                 || ("Inativos".equals(status) && !e.isActive())));
-    }
-
-    private static String orEmpty(String text) {
-        return text == null ? "" : text;
     }
 
     /**
@@ -373,22 +380,12 @@ public class CafeteriaController implements Initializable {
             if (selected != null && selected.getName().equals(newText)) {
                 return;
             }
-            String filter = normalize(newText);
-            filteredActiveEmployees.setPredicate(e -> filter.isEmpty() || normalize(e.getName()).contains(filter));
+            String filter = FormUtil.normalize(newText);
+            filteredActiveEmployees.setPredicate(e -> filter.isEmpty() || FormUtil.normalize(e.getName()).contains(filter));
             if (!employeeCombo.isShowing() && employeeCombo.isFocused()) {
                 employeeCombo.show();
             }
         });
-    }
-
-    /** Strips accents and lowercases, so the combo's search is more tolerant. */
-    private static String normalize(String text) {
-        if (text == null) {
-            return "";
-        }
-        String withoutAccents = Normalizer.normalize(text.trim(), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "");
-        return withoutAccents.toLowerCase();
     }
 
     /**
@@ -447,7 +444,12 @@ public class CafeteriaController implements Initializable {
     private void loadEmployeeForEditing(Employee e) {
         employeeNameField.setText(e.getName());
         employeeRegistrationField.setText(e.getRegistrationNumber());
-        employeeCategoryField.setText(e.getCategory());
+        // Category.equals is by id, so this preselects the matching item even
+        // though it's a different instance from the one in the combo's list.
+        // An employee whose category was deactivated (and is therefore not in
+        // the list of options) still shows it here instead of coming up blank
+        // -- see refreshCategoryOptions.
+        employeeCategoryCombo.setValue(e.getCategoryId() == null ? null : new Category(e.getCategoryId(), e.getCategoryName()));
         employeeSharedUsageCheckBox.setSelected(e.isSharedUsage());
         editingEmployeeId = e.getId();
         editingEmployeeActive = e.isActive();
@@ -461,7 +463,8 @@ public class CafeteriaController implements Initializable {
             Employee e = new Employee();
             e.setName(toTitleCase(employeeNameField.getText()));
             e.setRegistrationNumber(normalizeRegistrationNumber(employeeRegistrationField.getText()));
-            e.setCategory(toUpperCaseText(employeeCategoryField.getText()));
+            Category selectedCategory = employeeCategoryCombo.getValue();
+            e.setCategoryId(selectedCategory == null ? null : selectedCategory.getId());
             e.setSharedUsage(employeeSharedUsageCheckBox.isSelected());
             if (editingEmployeeId != null) {
                 // Updates the existing record -- preserves the original Active
@@ -488,7 +491,7 @@ public class CafeteriaController implements Initializable {
     private void onClearEmployeeForm() {
         employeeNameField.clear();
         employeeRegistrationField.clear();
-        employeeCategoryField.clear();
+        employeeCategoryCombo.setValue(null);
         employeeSharedUsageCheckBox.setSelected(false);
         editingEmployeeId = null;
         editingEmployeeJobTitle = null;
@@ -523,18 +526,163 @@ public class CafeteriaController implements Initializable {
         loadEmployees();
     }
 
+    // ================= CATEGORIES =================
+
+    private void configureCategoryTable() {
+        categoryNameColumn.setCellValueFactory(new PropertyValueFactory<>("name"));
+        // Counted from the employee list already in memory instead of one
+        // query per row -- it's the same list the Colaboradores tab shows, so
+        // the number on screen always matches what's on screen.
+        categoryEmployeeCountColumn.setCellValueFactory(data -> new SimpleStringProperty(
+                String.valueOf(employees.stream()
+                        .filter(e -> data.getValue().getId() != null
+                                && data.getValue().getId().equals(e.getCategoryId()))
+                        .count())));
+        categoryActiveColumn.setCellValueFactory(data -> new SimpleStringProperty(
+                data.getValue().isActive() ? "SIM" : "NÃO"));
+        categoryTable.setItems(categories);
+
+        // Double-click loads the category into the form for renaming, same as
+        // the Colaboradores tab.
+        categoryTable.setOnMouseClicked(event -> {
+            if (event.getClickCount() == 2) {
+                Category selected = categoryTable.getSelectionModel().getSelectedItem();
+                if (selected != null) {
+                    categoryNameField.setText(selected.getName());
+                    editingCategoryId = selected.getId();
+                    saveCategoryButton.setText("ATUALIZAR");
+                }
+            }
+        });
+    }
+
+    /**
+     * The category dropdown on the employee form. The null item is a real
+     * option ("sem categoria"), spelled out instead of rendering as a blank
+     * row -- same treatment the report's "Todos"/"Todas" combos get.
+     */
+    private void configureEmployeeCategoryCombo() {
+        employeeCategoryCombo.setConverter(new StringConverter<Category>() {
+            @Override
+            public String toString(Category category) {
+                return category == null ? "(sem categoria)" : category.getName();
+            }
+
+            @Override
+            public Category fromString(String text) {
+                return null; // not editable -- selection only
+            }
+        });
+        employeeCategoryCombo.setCellFactory(list -> new ListCell<Category>() {
+            @Override
+            protected void updateItem(Category item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty ? null : (item == null ? "(sem categoria)" : item.getName()));
+            }
+        });
+    }
+
+    private void loadCategories() {
+        categories.setAll(categoryService.findAll());
+        refreshCategoryOptions();
+    }
+
+    /**
+     * Refills the employee form's dropdown with the ACTIVE categories, keeping
+     * whatever was selected if it's still a valid option. A deactivated
+     * category stays out of the list so it can't be assigned to anyone new --
+     * employees already on it keep it (loadEmployeeForEditing puts it back in
+     * the box on its own).
+     */
+    private void refreshCategoryOptions() {
+        Category previous = employeeCategoryCombo.getValue();
+        ObservableList<Category> options = FXCollections.observableArrayList();
+        options.add(null); // "(sem categoria)"
+        categories.stream().filter(Category::isActive).forEach(options::add);
+        employeeCategoryCombo.setItems(options);
+        employeeCategoryCombo.setValue(options.contains(previous) ? previous : null);
+    }
+
+    @FXML
+    private void onSaveCategory() {
+        try {
+            Category category = new Category();
+            category.setName(categoryNameField.getText());
+            if (editingCategoryId != null) {
+                category.setId(editingCategoryId);
+                // Renaming only -- activating/deactivating has its own buttons.
+                categories.stream()
+                        .filter(existing -> existing.getId().equals(editingCategoryId))
+                        .findFirst()
+                        .ifPresent(existing -> category.setActive(existing.isActive()));
+                categoryService.update(category);
+            } else {
+                categoryService.register(category);
+            }
+            loadCategories();
+            // A rename changes the name shown on the employee table and in the
+            // report filters, both of which read the denormalized name.
+            loadEmployees();
+            onClearCategoryForm();
+        } catch (Exception e) {
+            log.warn("Failed to save category: {}", e.getMessage(), e);
+            AlertUtil.error("Erro ao salvar categoria", e.getMessage());
+        }
+    }
+
+    @FXML
+    private void onClearCategoryForm() {
+        categoryNameField.clear();
+        editingCategoryId = null;
+        saveCategoryButton.setText("SALVAR");
+        categoryTable.getSelectionModel().clearSelection();
+    }
+
+    @FXML
+    private void onDeactivateCategory() {
+        Category selected = categoryTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            AlertUtil.warning("Nenhuma categoria selecionada", "Selecione a categoria que deseja inativar.");
+            return;
+        }
+        long inUse = categoryService.countEmployees(selected.getId());
+        String message = inUse == 0
+                ? "Inativar a categoria \"" + selected.getName() + "\"?"
+                : "A categoria \"" + selected.getName() + "\" está em uso por " + inUse + " colaborador(es).\n\n"
+                        + "Eles continuam vinculados a ela e os relatórios anteriores não mudam -- a categoria"
+                        + " apenas deixa de aparecer para novos cadastros. Inativar mesmo assim?";
+        if (!AlertUtil.confirm("Inativar categoria", message)) {
+            return;
+        }
+        categoryService.deactivate(selected.getId());
+        loadCategories();
+        onClearCategoryForm();
+    }
+
+    @FXML
+    private void onActivateCategory() {
+        Category selected = categoryTable.getSelectionModel().getSelectedItem();
+        if (selected == null) {
+            AlertUtil.warning("Nenhuma categoria selecionada", "Selecione a categoria que deseja reativar.");
+            return;
+        }
+        categoryService.activate(selected.getId());
+        loadCategories();
+        onClearCategoryForm();
+    }
+
     // ================= MEAL REGISTRATION =================
 
     private void configureMealTable() {
         mealEmployeeColumn.setCellValueFactory(new PropertyValueFactory<>("employeeName"));
-        mealDateColumn.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
+        mealDateColumn.setCellValueFactory(data -> new SimpleStringProperty(
                 data.getValue().getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))));
-        mealTimeColumn.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
+        mealTimeColumn.setCellValueFactory(data -> new SimpleStringProperty(
                 data.getValue().getTime().format(DateTimeFormatter.ofPattern("HH:mm"))));
-        mealTypeColumn.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
+        mealTypeColumn.setCellValueFactory(data -> new SimpleStringProperty(
                 data.getValue().getType().getDescription()));
         mealPriceColumn.setCellValueFactory(new PropertyValueFactory<>("price"));
-        mealActiveColumn.setCellValueFactory(data -> new javafx.beans.property.SimpleStringProperty(
+        mealActiveColumn.setCellValueFactory(data -> new SimpleStringProperty(
                 data.getValue().isActive() ? "SIM" : "NÃO"));
         filteredMealsForTable = new FilteredList<>(meals, m -> true);
         mealTable.setItems(filteredMealsForTable);
@@ -590,14 +738,14 @@ public class CafeteriaController implements Initializable {
     }
 
     private void applyMealFilter() {
-        String name = normalize(mealFilterNameField.getText());
-        String category = normalize(mealFilterCategoryField.getText());
+        String name = FormUtil.normalize(mealFilterNameField.getText());
+        String category = FormUtil.normalize(mealFilterCategoryField.getText());
         MealType type = mealFilterTypeCombo.getValue();
         String status = mealFilterStatusCombo.getValue();
 
         filteredMealsForTable.setPredicate(m ->
-                (name.isEmpty() || normalize(m.getEmployeeName()).contains(name))
-                        && (category.isEmpty() || normalize(orEmpty(m.getEmployeeCategory())).contains(category))
+                (name.isEmpty() || FormUtil.normalize(m.getEmployeeName()).contains(name))
+                        && (category.isEmpty() || FormUtil.normalize(FormUtil.orEmpty(m.getEmployeeCategory())).contains(category))
                         && (type == null || type == m.getType())
                         && ("Todas".equals(status)
                                 || ("Ativas".equals(status) && m.isActive())
@@ -748,7 +896,7 @@ public class CafeteriaController implements Initializable {
             loadMeals(registrationWindowStart, registrationWindowEnd);
 
             clearMealForm();
-        } catch (java.time.format.DateTimeParseException e) {
+        } catch (DateTimeParseException e) {
             log.debug("Invalid meal time typed: {}", mealTimeField.getText());
             AlertUtil.error("Horário inválido", "Use o formato HH:mm, ex: 12:30.");
         } catch (Exception e) {
@@ -793,33 +941,21 @@ public class CafeteriaController implements Initializable {
     // ================= REPORT =================
 
     /**
-     * Configures the report's 3 optional filters (Categoria/Tipo/
-     * Colaborador), applied on top of the mandatory date range. Their
-     * options (categories and employees) are refreshed whenever the
-     * employee list reloads -- see refreshReportFilterOptions, called from
-     * loadEmployees().
+     * Configures the report's optional filters (Categoria/Tipo/Colaborador),
+     * applied on top of the mandatory date range. Categoria and Tipo are
+     * multi-select (CheckComboBox, from ControlsFX): any number of values
+     * can be checked, and the matching "exceto" checkbox next to each turns
+     * the checked values into an exclusion list instead of an inclusion
+     * list -- see ReportFilters, built by currentReportFilters() when a
+     * report is actually generated. Their item lists (categories and
+     * employees) are refreshed whenever the employee list reloads -- see
+     * refreshReportFilterOptions, called from loadEmployees().
      */
     private void configureReportFilters() {
-        configureMealTypeCombo(reportTypeCombo);
-
-        reportCategoryCombo.setConverter(new StringConverter<String>() {
-            @Override
-            public String toString(String category) {
-                return category == null ? "Todas" : category;
-            }
-
-            @Override
-            public String fromString(String text) {
-                return text;
-            }
-        });
-        reportCategoryCombo.setCellFactory(list -> new ListCell<String>() {
-            @Override
-            protected void updateItem(String item, boolean empty) {
-                super.updateItem(item, empty);
-                setText(empty ? null : (item == null ? "Todas" : item));
-            }
-        });
+        // MealType already orders its values the same way the rest of the
+        // screen's meal-type combos do (MealType.values() declaration order);
+        // kept consistent here instead of introducing a different order.
+        reportTypeCombo.getItems().setAll(MealType.values());
 
         reportEmployeeCombo.setConverter(new StringConverter<Employee>() {
             @Override
@@ -842,24 +978,43 @@ public class CafeteriaController implements Initializable {
     }
 
     /**
+     * Builds a ReportFilters from the Reports tab's current filter
+     * selections: whatever's checked in the Categoria/Tipo checklists (plus
+     * their "exceto" checkboxes) and the Colaborador combo -- passed as-is
+     * to MealService.generatePeriodReport/generatePeriodReportXlsx.
+     */
+    private ReportFilters currentReportFilters() {
+        Set<String> categories = new LinkedHashSet<>(reportCategoryCombo.getCheckModel().getCheckedItems());
+        Set<MealType> types = new LinkedHashSet<>(reportTypeCombo.getCheckModel().getCheckedItems());
+        return new ReportFilters(categories, reportCategoryExcludeCheck.isSelected(),
+                types, reportTypeExcludeCheck.isSelected(), reportEmployeeCombo.getValue());
+    }
+
+    /**
      * Rebuilds the Categoria/Colaborador report filter options from the
      * current employee list (categories: distinct, non-blank, sorted).
-     * Keeps the user's current selection if it's still a valid option after
-     * the refresh, otherwise falls back to "Todas"/"Todos".
+     * Keeps whichever of the user's checked categories are still valid
+     * options after the refresh (a category can disappear if the last
+     * employee using it was edited/removed); Colaborador falls back to
+     * "Todos" the same way it always did.
      */
     private void refreshReportFilterOptions() {
-        List<String> categories = employees.stream()
-                .map(Employee::getCategory)
-                .filter(c -> c != null && !c.isBlank())
-                .distinct()
+        // From the category registry, not from the distinct values found on
+        // the employee list: a category with no employee at the moment still
+        // has meals in past periods and must stay filterable. Inactive ones
+        // are included for the same reason.
+        List<String> categories = this.categories.stream()
+                .map(Category::getName)
+                .filter(name -> name != null && !name.isBlank())
                 .sorted(String.CASE_INSENSITIVE_ORDER)
-                .collect(java.util.stream.Collectors.toList());
-        ObservableList<String> categoryItems = FXCollections.observableArrayList();
-        categoryItems.add(null);
-        categoryItems.addAll(categories);
-        String previousCategory = reportCategoryCombo.getValue();
-        reportCategoryCombo.setItems(categoryItems);
-        reportCategoryCombo.setValue(categoryItems.contains(previousCategory) ? previousCategory : null);
+                .collect(Collectors.toList());
+        Set<String> previouslyChecked = new LinkedHashSet<>(reportCategoryCombo.getCheckModel().getCheckedItems());
+        reportCategoryCombo.getItems().setAll(categories);
+        for (String category : categories) {
+            if (previouslyChecked.contains(category)) {
+                reportCategoryCombo.getCheckModel().check(category);
+            }
+        }
 
         ObservableList<Employee> employeeItems = FXCollections.observableArrayList();
         employeeItems.add(null);
@@ -888,41 +1043,10 @@ public class CafeteriaController implements Initializable {
         }
 
         try {
-            mealService.generatePeriodReport(start, end, reportCategoryCombo.getValue(), reportTypeCombo.getValue(),
-                    reportEmployeeCombo.getValue(), destination);
+            mealService.generatePeriodReport(start, end, currentReportFilters(), destination);
             reportStatusLabel.setText("Relatório gerado com sucesso em: " + destination.getAbsolutePath());
         } catch (Exception e) {
             log.error("Failed to generate cafeteria report for period {} - {}", start, end, e);
-            reportStatusLabel.setText("Falha ao gerar relatório.");
-            AlertUtil.error("Erro ao gerar relatório", e.getMessage());
-        }
-    }
-
-    /** Same filters/period as onGenerateReport, but exported as a plain .txt file instead of a PDF. */
-    @FXML
-    private void onGenerateReportTxt() {
-        LocalDate start = reportStartDatePicker.getValue();
-        LocalDate end = reportEndDatePicker.getValue();
-        if (start == null || end == null) {
-            AlertUtil.warning("Período inválido", "Informe as duas datas do período.");
-            return;
-        }
-
-        FileChooser chooser = new FileChooser();
-        chooser.setTitle("Salvar relatório como...");
-        chooser.setInitialFileName("relatorio_refeitorio_" + start + "_a_" + end + ".txt");
-        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Texto (*.txt)", "*.txt"));
-        File destination = chooser.showSaveDialog(App.getMainStage());
-        if (destination == null) {
-            return;
-        }
-
-        try {
-            mealService.generatePeriodReportTxt(start, end, reportCategoryCombo.getValue(),
-                    reportTypeCombo.getValue(), reportEmployeeCombo.getValue(), destination);
-            reportStatusLabel.setText("Relatório (.txt) gerado com sucesso em: " + destination.getAbsolutePath());
-        } catch (Exception e) {
-            log.error("Failed to generate cafeteria TXT report for period {} - {}", start, end, e);
             reportStatusLabel.setText("Falha ao gerar relatório.");
             AlertUtil.error("Erro ao gerar relatório", e.getMessage());
         }
@@ -952,8 +1076,7 @@ public class CafeteriaController implements Initializable {
         }
 
         try {
-            mealService.generatePeriodReportXlsx(start, end, reportCategoryCombo.getValue(),
-                    reportTypeCombo.getValue(), reportEmployeeCombo.getValue(), destination);
+            mealService.generatePeriodReportXlsx(start, end, currentReportFilters(), destination);
             reportStatusLabel.setText("Relatório (.xlsx) gerado com sucesso em: " + destination.getAbsolutePath());
         } catch (Exception e) {
             log.error("Failed to generate cafeteria XLSX report for period {} - {}", start, end, e);
@@ -974,7 +1097,7 @@ public class CafeteriaController implements Initializable {
     }
 
     private static String formatPrice(BigDecimal price) {
-        return price.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+        return price.setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
 
     /**
@@ -1063,6 +1186,11 @@ public class CafeteriaController implements Initializable {
         int duplicates = 0;
         int errorCount = 0;
         List<String> problems = new ArrayList<>();
+        // Categories named in the file that aren't registered yet, with how
+        // many lines each one cost -- shown in its own dialog afterwards so
+        // whoever runs the import knows exactly what to register and re-run,
+        // same treatment the missing matrículas already get.
+        Map<String, Integer> unknownCategories = new LinkedHashMap<>();
 
         try {
             List<String> lines = Files.readAllLines(file.toPath(), StandardCharsets.UTF_8);
@@ -1095,10 +1223,23 @@ public class CafeteriaController implements Initializable {
                         continue;
                     }
 
+                    // The category must already exist in the registry: letting
+                    // the import create one on the fly is exactly how "UNICAMP"
+                    // and "UNICAM" both ended up as categories, splitting the
+                    // same company into two blocks on the billing report.
+                    String categoryName = toUpperCaseText(category);
+                    Optional<Category> knownCategory = categoryService.findByName(categoryName);
+                    if (knownCategory.isEmpty()) {
+                        unknownCategories.merge(categoryName, 1, Integer::sum);
+                        problems.add("Linha " + lineNumber + ": categoria \"" + categoryName
+                                + "\" não está cadastrada -- linha ignorada.");
+                        continue;
+                    }
+
                     Employee e = new Employee();
                     e.setName(toTitleCase(name.toString()));
                     e.setRegistrationNumber(registrationNumber);
-                    e.setCategory(toUpperCaseText(category));
+                    e.setCategoryId(knownCategory.get().getId());
                     employeeService.register(e);
                     imported++;
                 } catch (Exception e) {
@@ -1113,10 +1254,12 @@ public class CafeteriaController implements Initializable {
             return;
         }
 
-        log.info("Employee import finished: {} imported, {} duplicate(s), {} error(s) (file={})",
-                imported, duplicates, errorCount, file.getAbsolutePath());
+        log.info("Employee import finished: {} imported, {} duplicate(s), {} error(s), "
+                        + "{} unknown category(ies) (file={})",
+                imported, duplicates, errorCount, unknownCategories.size(), file.getAbsolutePath());
         loadEmployees();
         showImportSummary("Importação de colaboradores", imported, duplicates, errorCount, problems);
+        showUnknownCategoriesIfAny(unknownCategories);
     }
 
     /**
@@ -1154,6 +1297,15 @@ public class CafeteriaController implements Initializable {
         // instead of an unregistered matrícula -- see showDuplicateMealsIfAny,
         // called at the end of this method.
         Map<String, Integer> duplicateMeals = new LinkedHashMap<>();
+        // Same idea again, but for a registration number that DOES exist,
+        // just for an inactive employee -- findByRegistrationNumber matches
+        // active and inactive alike (it has to: the manual form's dedupe
+        // check and the unique constraint on cpf apply regardless of
+        // status), so without this check right here a turnstile record for
+        // someone who was deactivated would still be imported as a real
+        // meal. See showInactiveEmployeesIfAny, called at the end of this
+        // method.
+        Map<String, Integer> inactiveEmployees = new LinkedHashMap<>();
         LocalDate earliestDate = null;
         LocalDate latestDate = null;
         // Fetches the prices once before the loop (instead of one query per
@@ -1192,6 +1344,11 @@ public class CafeteriaController implements Initializable {
                     if (employee == null) {
                         errorCount++;
                         missingRegistrations.merge(registrationNumber, 1, Integer::sum);
+                        continue;
+                    }
+                    if (!employee.isActive()) {
+                        errorCount++;
+                        inactiveEmployees.merge(registrationNumber + " - " + employee.getName(), 1, Integer::sum);
                         continue;
                     }
 
@@ -1250,11 +1407,13 @@ public class CafeteriaController implements Initializable {
         loadMeals(registrationWindowStart, registrationWindowEnd);
 
         log.info("Meal import finished: {} imported, {} error(s), {} unregistered matrícula(s), "
-                        + "{} duplicate meal(s) (file={})",
-                imported, errorCount, missingRegistrations.size(), duplicateMeals.size(), file.getAbsolutePath());
+                        + "{} duplicate meal(s), {} inactive employee(s) (file={})",
+                imported, errorCount, missingRegistrations.size(), duplicateMeals.size(),
+                inactiveEmployees.size(), file.getAbsolutePath());
         showImportSummary("Importação de refeições", imported, 0, errorCount, problems);
         showMissingRegistrationsIfAny(missingRegistrations);
         showDuplicateMealsIfAny(duplicateMeals);
+        showInactiveEmployeesIfAny(inactiveEmployees);
     }
 
     /**
@@ -1274,42 +1433,14 @@ public class CafeteriaController implements Initializable {
             return;
         }
 
-        List<String> lines = missingRegistrations.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(entry -> entry.getKey() + "   (" + entry.getValue() + " refeição(ões) não incluída(s))")
-                .toList();
+        List<String> lines = toSortedLines(missingRegistrations, "refeição(ões) não incluída(s)");
 
-        TextArea listArea = new TextArea(String.join("\n", lines));
-        listArea.setEditable(false);
-        listArea.setWrapText(false);
-        listArea.setPrefSize(420, 320);
-
-        Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle("Matrículas não cadastradas");
-        alert.setHeaderText(lines.size() + " matrícula(s) sem cadastro apareceram nas refeições importadas.");
-        alert.setContentText(
+        showSkippedItemsDialog("Matrículas não cadastradas",
+                lines.size() + " matrícula(s) sem cadastro apareceram nas refeições importadas.",
                 "Essas refeições NÃO foram registradas porque a matrícula não existe em Colaboradores.\n"
-                        + "Cadastre essas pessoas na aba Colaboradores e reimporte o mesmo arquivo depois."
-                        + "As refeições já importadas com sucesso não são duplicadas.");
-        alert.getDialogPane().setExpandableContent(listArea);
-        alert.getDialogPane().setExpanded(true);
-        alert.setResizable(true);
-
-        ButtonType saveButtonType = new ButtonType("Salvar lista (.txt)", ButtonBar.ButtonData.OTHER);
-        // ButtonType.OK's ButtonData is OK_DONE, not CANCEL_CLOSE -- and a
-        // JavaFX Alert/Dialog only lets the window's own "X" button actually
-        // close it when at least one button is marked CANCEL_CLOSE (without
-        // one, clicking "X" is silently ignored, which is exactly the
-        // "the X doesn't work" bug reported). Recreating it here with
-        // CANCEL_CLOSE keeps the same "OK" label/behavior (just dismiss,
-        // nothing saved) while making "X" behave identically to clicking it.
-        ButtonType okButtonType = new ButtonType("OK", ButtonBar.ButtonData.CANCEL_CLOSE);
-        alert.getButtonTypes().setAll(saveButtonType, okButtonType);
-
-        Optional<ButtonType> result = alert.showAndWait();
-        if (result.isPresent() && result.get() == saveButtonType) {
-            saveMissingRegistrationsToFile(lines);
-        }
+                        + "Cadastre essas pessoas na aba Colaboradores e reimporte o mesmo arquivo depois. "
+                        + "As refeições já importadas com sucesso não são duplicadas.",
+                lines, this::saveMissingRegistrationsToFile);
     }
 
     /**
@@ -1329,38 +1460,118 @@ public class CafeteriaController implements Initializable {
             return;
         }
 
-        List<String> lines = duplicateMeals.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .map(entry -> entry.getKey() + "   (" + entry.getValue() + " ocorrência(s) ignorada(s))")
-                .toList();
+        List<String> lines = toSortedLines(duplicateMeals, "ocorrência(s) ignorada(s)");
 
+        showSkippedItemsDialog("Refeições duplicadas",
+                lines.size()
+                        + " refeição(ões) não foram importadas por já existir uma do mesmo tipo no mesmo dia.",
+                "Cada colaborador só pode ter uma refeição de cada tipo por dia.\n"
+                        + "As ocorrências abaixo foram ignoradas, confira se são leituras repetidas da"
+                        + " catraca ou se algum tipo de refeição foi registrado incorretamente.",
+                lines, this::saveDuplicateMealsToFile);
+    }
+
+    /**
+     * Shown right after showImportSummary when the employee import found a
+     * category that isn't registered yet. Those lines are rejected on purpose
+     * rather than creating the category on the fly: a typo in the file
+     * ("UNICAM" for "UNICAMP") would otherwise become a brand new category and
+     * split one company into two blocks on the report used to bill it.
+     */
+    private void showUnknownCategoriesIfAny(Map<String, Integer> unknownCategories) {
+        if (unknownCategories.isEmpty()) {
+            return;
+        }
+
+        List<String> lines = toSortedLines(unknownCategories, "colaborador(es) não importado(s)");
+
+        showSkippedItemsDialog("Categorias não cadastradas",
+                lines.size() + " categoria(s) do arquivo não existem no cadastro.",
+                "Esses colaboradores NÃO foram importados porque a categoria não está cadastrada.\n"
+                        + "Cadastre as categorias abaixo na aba Categorias e reimporte o mesmo arquivo depois. "
+                        + "Os colaboradores já importados com sucesso não são duplicados.",
+                lines, this::saveUnknownCategoriesToFile);
+    }
+
+    /**
+     * Shown right after showDuplicateMealsIfAny, only when the import found
+     * at least one line whose matrícula belongs to an employee that was
+     * deactivated (see inactiveEmployees in onImportMeals). Rejected on
+     * purpose instead of silently registering the meal: someone who was let
+     * go or reassigned shouldn't keep accumulating billable meals just
+     * because their old badge still reads at the turnstile.
+     */
+    private void showInactiveEmployeesIfAny(Map<String, Integer> inactiveEmployees) {
+        if (inactiveEmployees.isEmpty()) {
+            return;
+        }
+
+        List<String> lines = toSortedLines(inactiveEmployees, "refeição(ões) não incluída(s)");
+
+        showSkippedItemsDialog("Colaboradores inativos",
+                lines.size() + " matrícula(s) pertencem a colaborador(es) inativo(s).",
+                "Essas refeições NÃO foram registradas porque o colaborador está inativo.\n"
+                        + "Se a inativação foi um engano, reative a pessoa na aba Colaboradores e reimporte o "
+                        + "mesmo arquivo depois. As refeições já importadas com sucesso não são duplicadas.",
+                lines, this::saveInactiveEmployeesToFile);
+    }
+
+    /**
+     * Builds the sorted "key   (count suffix)" lines the four "what the
+     * import left out" dialogs below all show -- e.g. counts=(matrícula ->
+     * how many meals it caused to be skipped), suffix="refeição(ões) não
+     * incluída(s)" renders "00012345   (3 refeição(ões) não incluída(s))".
+     */
+    private static List<String> toSortedLines(Map<String, Integer> counts, String suffix) {
+        return counts.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> entry.getKey() + "   (" + entry.getValue() + " " + suffix + ")")
+                .toList();
+    }
+
+    /**
+     * The dialog the four "what the import left out" lists share
+     * (showMissingRegistrationsIfAny, showDuplicateMealsIfAny,
+     * showUnknownCategoriesIfAny, showInactiveEmployeesIfAny): a resizable, scrollable, copy-pasteable
+     * text area -- a plain Alert's fixed content text doesn't handle a long
+     * list well -- plus the option to save it as a .txt, which is easier to
+     * act on (share with RH, check off) than reading it off the screen.
+     *
+     * The OK button is deliberately rebuilt with CANCEL_CLOSE instead of
+     * using ButtonType.OK: a JavaFX Alert only lets the window's own "X"
+     * actually close it when at least one button carries that ButtonData
+     * (without it, clicking "X" is silently ignored -- the "the X doesn't
+     * work" bug). The label and behavior stay the same, just dismiss.
+     */
+    private void showSkippedItemsDialog(String title, String headerText, String contentText,
+                                         List<String> lines, java.util.function.Consumer<List<String>> saveAction) {
         TextArea listArea = new TextArea(String.join("\n", lines));
         listArea.setEditable(false);
         listArea.setWrapText(false);
         listArea.setPrefSize(420, 320);
 
         Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle("Refeições duplicadas");
-        alert.setHeaderText(lines.size()
-                + " refeição(ões) não foram importadas por já existir uma do mesmo tipo no mesmo dia.");
-        alert.setContentText(
-                "Cada colaborador só pode ter uma refeição de cada tipo por dia\n"
-                        + "As ocorrências abaixo foram ignoradas, confira se são leituras repetidas da"
-                        + " catraca ou se algum tipo de refeição foi registrado incorretamente.");
+        alert.setTitle(title);
+        alert.setHeaderText(headerText);
+        alert.setContentText(contentText);
         alert.getDialogPane().setExpandableContent(listArea);
         alert.getDialogPane().setExpanded(true);
         alert.setResizable(true);
 
         ButtonType saveButtonType = new ButtonType("Salvar lista (.txt)", ButtonBar.ButtonData.OTHER);
-        // Same CANCEL_CLOSE fix as showMissingRegistrationsIfAny, so the
-        // window's "X" button closes this dialog too.
         ButtonType okButtonType = new ButtonType("OK", ButtonBar.ButtonData.CANCEL_CLOSE);
         alert.getButtonTypes().setAll(saveButtonType, okButtonType);
 
         Optional<ButtonType> result = alert.showAndWait();
         if (result.isPresent() && result.get() == saveButtonType) {
-            saveDuplicateMealsToFile(lines);
+            saveAction.accept(lines);
         }
+    }
+
+    /** Saves the unknown-category list (see showUnknownCategoriesIfAny) as a plain .txt file. */
+    private void saveUnknownCategoriesToFile(List<String> lines) {
+        saveListToFile("Salvar lista de categorias não cadastradas", "categorias_nao_cadastradas",
+                "CATEGORIAS NÃO CADASTRADAS -- colaboradores do arquivo que ficaram de fora", lines);
     }
 
     /** Saves the missing-registration list (see showMissingRegistrationsIfAny) as a plain .txt file. */
@@ -1374,6 +1585,13 @@ public class CafeteriaController implements Initializable {
         saveListToFile("Salvar lista de refeições duplicadas", "refeicoes_duplicadas",
                 "REFEIÇÕES DUPLICADAS -- refeições importadas que ficaram de fora por já existir"
                         + " uma do mesmo tipo no mesmo dia", lines);
+    }
+
+    /** Saves the inactive-employee list (see showInactiveEmployeesIfAny) as a plain .txt file. */
+    private void saveInactiveEmployeesToFile(List<String> lines) {
+        saveListToFile("Salvar lista de colaboradores inativos", "colaboradores_inativos",
+                "COLABORADORES INATIVOS -- refeições importadas que ficaram de fora porque a matrícula"
+                        + " pertence a um colaborador inativo", lines);
     }
 
     /**
@@ -1436,11 +1654,6 @@ public class CafeteriaController implements Initializable {
 
     @FXML
     private void onBack() {
-        try {
-            App.switchScene("/fxml/hub.fxml", "Harmonia");
-        } catch (IOException e) {
-            log.error("Failed to navigate back to the hub", e);
-            AlertUtil.error("Erro", "Não foi possível voltar ao hub: " + e.getMessage());
-        }
+        App.backToHub();
     }
 }

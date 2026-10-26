@@ -20,12 +20,13 @@
 <?import javafx.scene.layout.RowConstraints?>
 <?import javafx.scene.layout.VBox?>
 <?import javafx.scene.text.Font?>
+<?import org.controlsfx.control.CheckComboBox?>
 
-<BorderPane prefHeight="620" prefWidth="1100.0" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospital.harmonia.controller.CafeteriaController">
+<BorderPane prefHeight="700" prefWidth="1250.0" xmlns="http://javafx.com/javafx/26" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.hospital.harmonia.controller.CafeteriaController">
 
     <top>
         <HBox alignment="CENTER_RIGHT" prefHeight="32.0" prefWidth="900.0" spacing="12.0" style="-fx-background-color: white;">
-            <Button alignment="CENTER_RIGHT" onAction="#onBack" text="◀ Início">
+            <Button alignment="CENTER_RIGHT" onAction="#onBack" text="◀ Voltar">
             <font>
                <Font name="Microsoft YaHei UI" size="12.0" />
             </font>
@@ -85,7 +86,7 @@
                            <Insets top="10.0" />
                         </VBox.margin>
                      </Label>
-                            <TextField fx:id="employeeCategoryField" prefHeight="30.0" prefWidth="330.0" />
+                            <ComboBox fx:id="employeeCategoryCombo" prefHeight="30.0" prefWidth="330.0" />
                             <CheckBox fx:id="employeeSharedUsageCheckBox" mnemonicParsing="false" text="Matrícula de uso compartilhado (ex.: plantão médico)">
                         <VBox.margin>
                            <Insets top="10.0" />
@@ -152,7 +153,106 @@
                 </BorderPane>
             </Tab>
 
-               <!-- ==================== TAB 2: MEAL REGISTRATION ==================== -->
+               <!-- ==================== TAB 2: CATEGORIES ==================== -->
+            <Tab text="Categorias">
+                <BorderPane style="-fx-background-color: white;">
+                    <padding>
+                        <Insets bottom="16" left="16" right="16" top="16" />
+                    </padding>
+
+                    <left>
+                        <VBox prefWidth="330.0" spacing="4.0">
+                            <Label styleClass="subtitle" text="CADASTRAR CATEGORIA">
+                                <font>
+                                    <Font name="Microsoft YaHei UI Bold" size="16.0" />
+                                </font>
+                                <VBox.margin>
+                                    <Insets bottom="10.0" />
+                                </VBox.margin>
+                            </Label>
+
+                            <Label text="Nome da categoria">
+                                <font>
+                                    <Font name="Microsoft YaHei UI" size="13.0" />
+                                </font>
+                            </Label>
+                            <TextField fx:id="categoryNameField" prefHeight="30.0" prefWidth="330.0" />
+
+                            <Label text="O nome é gravado em maiúsculas. Duas categorias não podem ter o mesmo nome, mesmo escrito com outra caixa." wrapText="true">
+                                <font>
+                                    <Font name="Microsoft YaHei UI" size="11.0" />
+                                </font>
+                                <VBox.margin>
+                                    <Insets top="6.0" />
+                                </VBox.margin>
+                            </Label>
+
+                            <HBox spacing="8.0">
+                                <VBox.margin>
+                                    <Insets top="14.0" />
+                                </VBox.margin>
+                                <Button fx:id="saveCategoryButton" onAction="#onSaveCategory" styleClass="primary-button" stylesheets="@../css/styles.css" text="SALVAR">
+                                    <font>
+                                        <Font name="Microsoft YaHei UI" size="12.0" />
+                                    </font>
+                                </Button>
+                                <Button onAction="#onClearCategoryForm" styleClass="secondary-button" stylesheets="@../css/styles.css" text="LIMPAR">
+                                    <font>
+                                        <Font name="Microsoft YaHei UI" size="12.0" />
+                                    </font>
+                                </Button>
+                            </HBox>
+
+                            <HBox spacing="8.0">
+                                <VBox.margin>
+                                    <Insets top="8.0" />
+                                </VBox.margin>
+                                <Button onAction="#onDeactivateCategory" styleClass="secondary-button" stylesheets="@../css/styles.css" text="INATIVAR">
+                                    <font>
+                                        <Font name="Microsoft YaHei UI" size="12.0" />
+                                    </font>
+                                </Button>
+                                <Button onAction="#onActivateCategory" styleClass="secondary-button" stylesheets="@../css/styles.css" text="REATIVAR">
+                                    <font>
+                                        <Font name="Microsoft YaHei UI" size="12.0" />
+                                    </font>
+                                </Button>
+                            </HBox>
+
+                            <Label text="Dê duplo clique numa categoria da lista para renomeá-la. Inativar não apaga: quem já usa a categoria continua vinculado, ela só deixa de aparecer para novos cadastros." wrapText="true">
+                                <font>
+                                    <Font name="Microsoft YaHei UI" size="11.0" />
+                                </font>
+                                <VBox.margin>
+                                    <Insets top="14.0" />
+                                </VBox.margin>
+                            </Label>
+                        </VBox>
+                    </left>
+
+                    <center>
+                        <VBox spacing="8.0">
+                            <padding>
+                                <Insets left="24.0" />
+                            </padding>
+                            <Label styleClass="subtitle" text="CATEGORIAS CADASTRADAS">
+                                <font>
+                                    <Font name="Microsoft YaHei UI Bold" size="16.0" />
+                                </font>
+                            </Label>
+                            <TableView fx:id="categoryTable" VBox.vgrow="ALWAYS">
+                                <columns>
+                                    <TableColumn fx:id="categoryNameColumn" prefWidth="320.0" text="Categoria" />
+                                    <TableColumn fx:id="categoryEmployeeCountColumn" prefWidth="140.0" text="Colaboradores" />
+                                    <TableColumn fx:id="categoryActiveColumn" prefWidth="100.0" text="Ativa" />
+                                </columns>
+                            </TableView>
+                        </VBox>
+                    </center>
+                </BorderPane>
+            </Tab>
+
+               <!-- ==================== TAB 3: MEAL REGISTRATION ==================== -->
             <Tab text="Refeições">
                 <BorderPane style="-fx-background-color: white;">
                     <padding>
@@ -255,7 +355,7 @@
                 </BorderPane>
             </Tab>
 
-               <!-- ==================== TAB 3: REPORT ==================== -->
+               <!-- ==================== TAB 4: REPORT ==================== -->
             <Tab text="Relatórios">
                 <VBox spacing="16">
                     <padding>
@@ -270,23 +370,24 @@
                        <GridPane hgap="12" vgap="12">
                         <Label text="De:" GridPane.columnIndex="0" GridPane.rowIndex="0" />
                         <DatePicker fx:id="reportStartDatePicker" prefHeight="30.0" prefWidth="174.0" GridPane.columnIndex="1" GridPane.rowIndex="0" />
-                        <Label text="Até" GridPane.columnIndex="2" GridPane.rowIndex="0" />
+                        <Label text="Até:" GridPane.columnIndex="2" GridPane.rowIndex="0" />
                         <DatePicker fx:id="reportEndDatePicker" prefHeight="30.0" prefWidth="174.0" GridPane.columnIndex="3" GridPane.rowIndex="0" />
 
                         <Label text="Categoria:" GridPane.columnIndex="0" GridPane.rowIndex="1" />
-                        <ComboBox fx:id="reportCategoryCombo" prefHeight="30.0" prefWidth="174.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
+                        <CheckComboBox fx:id="reportCategoryCombo" prefHeight="30.0" prefWidth="174.0" GridPane.columnIndex="1" GridPane.rowIndex="1" />
                         <Label text="Tipo:" GridPane.columnIndex="2" GridPane.rowIndex="1" />
-                        <ComboBox fx:id="reportTypeCombo" prefHeight="30.0" prefWidth="174.0" GridPane.columnIndex="3" GridPane.rowIndex="1" />
+                        <CheckComboBox fx:id="reportTypeCombo" prefHeight="30.0" prefWidth="174.0" GridPane.columnIndex="3" GridPane.rowIndex="1" />
                         <Label text="Colaborador:" GridPane.columnIndex="0" GridPane.rowIndex="2" />
                         <ComboBox fx:id="reportEmployeeCombo" prefHeight="30.0" prefWidth="174.0" GridPane.columnIndex="1" GridPane.rowIndex="2" />
 
+                        <!-- When checked, the Categoria/Tipo selections above become an
+                             exclusion list ("everyone EXCEPT these") instead of the default
+                             inclusion list ("only these"); see ReportFilters. -->
+                        <CheckBox fx:id="reportCategoryExcludeCheck" text="Excluir selecionadas (exceto)" GridPane.columnIndex="1" GridPane.rowIndex="3" />
+                        <CheckBox fx:id="reportTypeExcludeCheck" text="Excluir selecionados (exceto)" GridPane.columnIndex="3" GridPane.rowIndex="3" />
+
                           <HBox spacing="8.0" GridPane.columnIndex="4" GridPane.rowIndex="0">
                            <Button onAction="#onGenerateReport" styleClass="secondary-button" stylesheets="@../css/styles.css" text="Gerar PDF">
-                     <font>
-                        <Font name="Microsoft YaHei UI" size="12.0" />
-                     </font>
-                  </Button>
-                           <Button onAction="#onGenerateReportTxt" styleClass="secondary-button" stylesheets="@../css/styles.css" text="Gerar TXT">
                      <font>
                         <Font name="Microsoft YaHei UI" size="12.0" />
                      </font>
@@ -305,6 +406,7 @@
                      <ColumnConstraints />
                   </columnConstraints>
                   <rowConstraints>
+                     <RowConstraints />
                      <RowConstraints />
                      <RowConstraints />
                      <RowConstraints />

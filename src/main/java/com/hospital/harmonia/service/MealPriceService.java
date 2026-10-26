@@ -20,9 +20,28 @@ public class MealPriceService {
 
     private static final Logger log = LoggerFactory.getLogger(MealPriceService.class);
 
-    private final MealPriceDao mealPriceDao = new MealPriceDaoImpl();
+    private final MealPriceDao mealPriceDao;
 
-    /** Current price (configured or default) of each type -- used to fill the screen. */
+    public MealPriceService() {
+        this(new MealPriceDaoImpl());
+    }
+
+    /** Package-visible constructor allowing a test double to be injected (see MealPriceServiceTest). */
+    MealPriceService(MealPriceDao mealPriceDao) {
+        this.mealPriceDao = mealPriceDao;
+    }
+
+    /**
+     * Current price (configured or default) of each type -- used to fill the screen.
+     *
+     * Deliberately NOT named findAll(), unlike the equivalent "get everything"
+     * method on the other services: this merges the DAO's findAll() with
+     * MealType.getDefaultPrice() for whatever hasn't been configured yet (see
+     * below), so it never behaves like a plain passthrough the way
+     * EmployeeService.findAll() and UserService.findAll() do -- calling it
+     * findAll() would suggest it just relays MealPriceDao.findAll(), which
+     * only returns the types actually configured in the database.
+     */
     public Map<MealType, BigDecimal> listPrices() {
         Map<MealType, BigDecimal> configured = mealPriceDao.findAll();
         Map<MealType, BigDecimal> prices = new EnumMap<>(MealType.class);
@@ -37,7 +56,13 @@ public class MealPriceService {
         return mealPriceDao.findAll().getOrDefault(type, type.getDefaultPrice());
     }
 
-    /** Saves (upserts) the price of each given type. None can be negative. */
+    /**
+     * Saves (upserts) the price of each given type, all as one atomic
+     * operation (see MealPriceDao.saveAll) -- either every type's new price
+     * takes effect or none does, instead of the screen's "save" possibly
+     * leaving some types priced under the new table and others still under
+     * the old one. None can be negative.
+     */
     public void savePrices(Map<MealType, BigDecimal> prices) {
         for (Map.Entry<MealType, BigDecimal> entry : prices.entrySet()) {
             BigDecimal price = entry.getValue();
@@ -46,9 +71,7 @@ public class MealPriceService {
                         "Preço de " + entry.getKey().getDescription() + " inválido.");
             }
         }
-        for (Map.Entry<MealType, BigDecimal> entry : prices.entrySet()) {
-            mealPriceDao.save(entry.getKey(), entry.getValue());
-        }
+        mealPriceDao.saveAll(prices);
         log.debug("Meal prices saved for {} type(s).", prices.size());
     }
 }

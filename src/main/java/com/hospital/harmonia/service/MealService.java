@@ -26,14 +26,11 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -104,21 +101,19 @@ public class MealService {
     }
 
     /**
-     * Only the active ones, additionally filtered by category/type/employee
-     * (any of the three can be null/blank to mean "no filter on that field")
-     * -- used by both report formats (PDF and TXT). The filtering itself
-     * happens in Java, on top of findActiveByPeriod(start, end), instead of
-     * adding more WHERE clauses to the SQL: the cafeteria's data volume is
-     * small, and keeping the filtering here (rather than spread across DAO
-     * query variants) keeps it in one place, easy to extend later.
+     * Only the active ones, additionally filtered by the given ReportFilters
+     * (category/type can each be a set of values, plain or inverted/"except",
+     * plus a single optional employee) -- used by the report formats (PDF
+     * and XLSX). The filtering itself happens in Java, on top of
+     * findActiveByPeriod(start, end), instead of adding more WHERE clauses
+     * to the SQL: the cafeteria's data volume is small, and keeping the
+     * filtering here (rather than spread across DAO query variants) keeps it
+     * in one place, easy to extend later.
      */
-    public List<Meal> findActiveByPeriod(LocalDate start, LocalDate end, String category, MealType type,
-                                          Employee employee) {
+    public List<Meal> findActiveByPeriod(LocalDate start, LocalDate end, ReportFilters filters) {
         List<Meal> meals = findActiveByPeriod(start, end);
         return meals.stream()
-                .filter(m -> category == null || category.isBlank() || category.equalsIgnoreCase(m.getEmployeeCategory()))
-                .filter(m -> type == null || type == m.getType())
-                .filter(m -> employee == null || employee.getId().equals(m.getEmployeeId()))
+                .filter(filters::matches)
                 .collect(Collectors.toList());
     }
 
@@ -132,14 +127,27 @@ public class MealService {
     /**
      * Generates the PDF report for the given period, using JasperReports.
      * The .jrxml file lives at src/main/resources/reports/refeitorio_report.jrxml.
-     * category/type/employee are optional filters (any can be null/blank to
-     * mean "don't filter by this") applied on top of the date range.
+     * filters is optional (ReportFilters.none() applies no restriction at
+     * all) and is applied on top of the date range -- see ReportFilters for
+     * how category/type each support multiple values and an "except" mode.
+     *
+     * The report is organized in blocks: one block per employee category,
+     * each with a sub-section per employee listing their meals (date/time),
+     * and a total (plus a per-type breakdown) for the category -- driven by
+     * two nested groups in the .jrxml (category, then employee). Nested
+     * JasperReports groups require the underlying data pre-sorted the same
+     * way they're nested, hence reportOrder() below before handing the list
+     * to JasperReports.
      */
-    public File generatePeriodReport(LocalDate start, LocalDate end, String category, MealType type,
-                                      Employee employee, File outputFile) throws Exception {
+    public File generatePeriodReport(LocalDate start, LocalDate end, ReportFilters filters,
+                                      File outputFile) throws Exception {
         // Only active meals go into the report/total -- a deactivated
         // (canceled) meal stays visible on screen as a log, but shouldn't be billed.
-        List<Meal> meals = findActiveByPeriod(start, end, category, type, employee);
+        List<Meal> meals = findActiveByPeriod(start, end, filters);
+
+        List<Meal> sortedMeals = meals.stream()
+                .sorted(reportOrder())
+                .collect(Collectors.toList());
 
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("startDate", start.format(DATE_FORMAT));
@@ -148,57 +156,57 @@ public class MealService {
         parameters.put("quantity", meals.size());
         parameters.put("typeBreakdown", formatTypeBreakdown(meals));
         parameters.put("categoryBreakdown", formatCategoryBreakdown(meals));
-        parameters.put("filters", describeFilters(category, type, employee));
+        parameters.put("filters", describeFilters(filters));
 
-        return ReportGenerator.generatePdf("/reports/refeitorio_report.jrxml", parameters, meals, outputFile);
+        return ReportGenerator.generatePdf("/reports/refeitorio_report.jrxml", parameters, sortedMeals, outputFile);
     }
 
     /**
-     * Generates the same report as generatePeriodReport, but as a plain,
-     * fixed-width .txt file instead of a PDF -- built by hand here (instead
-     * of through JasperReports) since a hand-formatted table is simpler and
-     * more predictable for plain text than JasperReports' own text export.
-     * Written with a UTF-8 BOM so accented characters display correctly when
-     * opened in Windows Notepad.
+     * Canonical key that decides which category block a meal lands in on the
+     * PDF report. Categories are free text typed by hand on the employee
+     * record, so the same category shows up as "Alunos" on one record and
+     * "ALUNOS" on another -- they mean the same group of people and must end
+     * up in the same block.
+     *
+     * The groupExpression in refeitorio_report.jrxml applies this exact same
+     * rule (blank -> "Sem categoria", then uppercase). The two MUST stay in
+     * sync: JasperReports starts a new block whenever its expression changes,
+     * so if the template grouped by the raw value while this sorted
+     * case-insensitively, "Alunos" and "ALUNOS" would be interleaved and the
+     * template would emit two blocks with the same title and split totals --
+     * while the period summary at the end (formatCategoryBreakdown, which
+     * merges case-insensitively) reported a single combined number. Same PDF,
+     * two different answers.
      */
-    public File generatePeriodReportTxt(LocalDate start, LocalDate end, String category, MealType type,
-                                         Employee employee, File outputFile) throws IOException {
-        List<Meal> meals = findActiveByPeriod(start, end, category, type, employee);
-        DecimalFormat money = new DecimalFormat("#,##0.00");
+    private static String categoryGroupKey(String category) {
+        return normalizeCategory(category).toUpperCase();
+    }
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("RELATÓRIO DE REFEIÇÕES\n");
-        sb.append("Período: ").append(start.format(DATE_FORMAT)).append(" a ").append(end.format(DATE_FORMAT)).append("\n");
-        String filters = describeFilters(category, type, employee);
-        if (!filters.isEmpty()) {
-            sb.append("Filtros: ").append(filters).append("\n");
-        }
-        sb.append(meals.size()).append(" refeição(ões) encontrada(s)\n\n");
-
-        String rowFormat = "%-30s %-18s %-14s %-6s %-10s %10s%n";
-        sb.append(String.format(rowFormat, "COLABORADOR", "CATEGORIA", "TIPO", "HORA", "DATA", "PREÇO(R$)"));
-        sb.append("-".repeat(92)).append("\n");
-        for (Meal m : meals) {
-            sb.append(String.format(rowFormat,
-                    truncate(m.getEmployeeName(), 30),
-                    truncate(m.getEmployeeCategory(), 18),
-                    truncate(m.getType().getDescription(), 14),
-                    m.getTime().format(DateTimeFormatter.ofPattern("HH:mm")),
-                    m.getDate().format(DATE_FORMAT),
-                    money.format(m.getPrice())));
-        }
-        sb.append("-".repeat(92)).append("\n\n");
-        sb.append("TOTAL DO PERÍODO: R$ ").append(money.format(totalForPeriod(meals))).append("\n");
-        sb.append("QUANTIDADE POR TIPO DE REFEIÇÃO: ").append(formatTypeBreakdown(meals)).append("\n");
-        sb.append("QUANTIDADE POR CATEGORIA: ").append(formatCategoryBreakdown(meals)).append("\n");
-        sb.append("Gerado em ").append(LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))).append("\n");
-
-        try (Writer writer = new OutputStreamWriter(new FileOutputStream(outputFile), StandardCharsets.UTF_8)) {
-            writer.write('\uFEFF'); // UTF-8 BOM, so accents show correctly in Notepad
-            writer.write(sb.toString());
-        }
-        log.info("TXT report generated successfully: {}", outputFile.getAbsolutePath());
-        return outputFile;
+    /**
+     * The order the PDF report's data must be in, matching how the .jrxml
+     * nests its groups: category block, then one sub-section per employee,
+     * then that employee's meals chronologically. JasperReports only closes a
+     * group when the group expression changes, so every record belonging to
+     * the same block has to be adjacent here -- and these sort keys have to be
+     * the SAME keys the template groups by, or a block gets split in two.
+     *
+     * Employees are ordered by name but separated by id: the database only
+     * enforces a unique matrícula, not a unique name, so two different people
+     * can legitimately both be "Maria Silva". Without the id in the sort (and
+     * in the template's group expression) their meals would be merged into a
+     * single block under a single total, making it impossible to tell who
+     * consumed what -- on the document used to bill the outsourced company.
+     *
+     * Package-visible so MealServiceTest can verify the ordering without
+     * having to run JasperReports.
+     */
+    static Comparator<Meal> reportOrder() {
+        return Comparator
+                .comparing((Meal m) -> categoryGroupKey(m.getEmployeeCategory()))
+                .thenComparing(Meal::getEmployeeName, String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(Meal::getEmployeeId, Comparator.nullsLast(Comparator.<Integer>naturalOrder()))
+                .thenComparing(Meal::getDate)
+                .thenComparing(Meal::getTime);
     }
 
     // Meal types shown in the calendar-grid Excel report (and in its summary),
@@ -228,15 +236,16 @@ public class MealService {
      * Generates a calendar-style .xlsx report: one small table per day in
      * the period (date, quantity per meal type, and a "TOTAL GERAL" for that
      * day), arranged GRID_COLUMNS-across and wrapping downward -- the same
-     * layout the cafeteria used to fill by hand in Excel -- followed by a
-     * summary with the quantity and total R$ for the whole period, per meal
-     * type. Days with no meals still show up in the grid, with zeros.
-     * Uses Apache POI; category/type/employee are the same optional filters
-     * as the PDF/TXT reports (null/blank means "don't filter by this").
+     * layout the cafeteria used to fill by hand in Excel -- with a summary
+     * table (quantity and total R$ for the whole period, per meal type)
+     * placed beside the grid, to its right, instead of below it. Days with
+     * no meals still show up in the grid, with zeros. Uses Apache POI;
+     * filters is the same ReportFilters as the PDF report (ReportFilters.none()
+     * means "don't filter by anything").
      */
-    public File generatePeriodReportXlsx(LocalDate start, LocalDate end, String category, MealType type,
-                                          Employee employee, File outputFile) throws IOException {
-        List<Meal> meals = findActiveByPeriod(start, end, category, type, employee);
+    public File generatePeriodReportXlsx(LocalDate start, LocalDate end, ReportFilters filters,
+                                          File outputFile) throws IOException {
+        List<Meal> meals = findActiveByPeriod(start, end, filters);
 
         // Every day in the period starts at zero, so a day with no meals
         // still shows up in the grid (instead of just being skipped).
@@ -264,10 +273,10 @@ public class MealService {
             periodRow.createCell(0).setCellValue(
                     "Período: " + start.format(DATE_FORMAT) + " a " + end.format(DATE_FORMAT));
 
-            String filters = describeFilters(category, type, employee);
-            if (!filters.isEmpty()) {
+            String filtersText = describeFilters(filters);
+            if (!filtersText.isEmpty()) {
                 Row filtersRow = sheet.createRow(rowIdx++);
-                filtersRow.createCell(0).setCellValue("Filtros: " + filters);
+                filtersRow.createCell(0).setCellValue("Filtros: " + filtersText);
             }
             rowIdx++; // blank separator row before the grid
 
@@ -284,14 +293,21 @@ public class MealService {
                 writeDateBlock(sheet, styles, baseRow, baseCol, date, countsByDate.get(date));
             }
 
-            int gridEndRow = gridStartRow + rowsPerColumn * BLOCK_HEIGHT;
-            writeSummary(sheet, styles, gridEndRow + 1, meals);
-
             int usedColumns = GRID_COLUMNS * (BLOCK_WIDTH + 1) - 1; // last block has no trailing gap
+            int summaryColumn = usedColumns + 2; // one gap column to the right of the grid
+
+            // Placed beside the grid (to the right, at the same row it starts)
+            // instead of below it -- keeps the summary visible without having
+            // to scroll past every date block first.
+            writeSummary(sheet, styles, gridStartRow, summaryColumn, meals);
+
             for (int c = 0; c <= usedColumns; c++) {
                 boolean gapColumn = (c + 1) % (BLOCK_WIDTH + 1) == 0;
                 sheet.setColumnWidth(c, gapColumn ? 500 : 4200);
             }
+            sheet.setColumnWidth(summaryColumn, 4500);
+            sheet.setColumnWidth(summaryColumn + 1, 2500);
+            sheet.setColumnWidth(summaryColumn + 2, 3200);
 
             try (FileOutputStream fos = new FileOutputStream(outputFile)) {
                 workbook.write(fos);
@@ -339,8 +355,14 @@ public class MealService {
         totalValueCell.setCellStyle(styles.totalValue);
     }
 
-    /** Writes the period's summary (quantity and R$ per meal type, plus the grand total) below the grid. */
-    private static void writeSummary(Sheet sheet, XlsxStyles styles, int startRow, List<Meal> meals) {
+    /**
+     * Writes the period's summary (quantity and R$ per meal type, plus the
+     * grand total) starting at (startRow, startColumn) -- placed beside the
+     * date-block grid (see the call site in generatePeriodReportXlsx), using
+     * getOrCreateRow since some of those rows are already shared with the
+     * grid's own date blocks at lower columns.
+     */
+    private static void writeSummary(Sheet sheet, XlsxStyles styles, int startRow, int startColumn, List<Meal> meals) {
         Map<MealType, Long> quantityByType = new EnumMap<>(MealType.class);
         Map<MealType, BigDecimal> totalByType = new EnumMap<>(MealType.class);
         for (Meal m : meals) {
@@ -354,13 +376,13 @@ public class MealService {
         DecimalFormat money = new DecimalFormat("#,##0.00");
         int r = startRow;
 
-        Row titleRow = sheet.createRow(r++);
-        titleRow.createCell(0).setCellValue("TOTAL DO PERÍODO");
+        Row titleRow = getOrCreateRow(sheet, r++);
+        titleRow.createCell(startColumn).setCellValue("TOTAL DO PERÍODO");
 
-        Row headerRow = sheet.createRow(r++);
-        writeCell(headerRow, 0, "TIPO DE REFEIÇÃO", styles.summaryHeader);
-        writeCell(headerRow, 1, "QTDE.", styles.summaryHeader);
-        writeCell(headerRow, 2, "R$", styles.summaryHeader);
+        Row headerRow = getOrCreateRow(sheet, r++);
+        writeCell(headerRow, startColumn, "TIPO DE REFEIÇÃO", styles.summaryHeader);
+        writeCell(headerRow, startColumn + 1, "QTDE.", styles.summaryHeader);
+        writeCell(headerRow, startColumn + 2, "R$", styles.summaryHeader);
 
         long grandTotalQty = 0;
         BigDecimal grandTotalMoney = BigDecimal.ZERO;
@@ -370,16 +392,16 @@ public class MealService {
             grandTotalQty += qty;
             grandTotalMoney = grandTotalMoney.add(value);
 
-            Row row = sheet.createRow(r++);
-            writeCell(row, 0, gridType.getDescription().toUpperCase(), styles.summaryLabel);
-            writeCell(row, 1, String.valueOf(qty), styles.summaryValue);
-            writeCell(row, 2, "R$ " + money.format(value), styles.summaryValue);
+            Row row = getOrCreateRow(sheet, r++);
+            writeCell(row, startColumn, gridType.getDescription().toUpperCase(), styles.summaryLabel);
+            writeCell(row, startColumn + 1, String.valueOf(qty), styles.summaryValue);
+            writeCell(row, startColumn + 2, "R$ " + money.format(value), styles.summaryValue);
         }
 
-        Row totalRow = sheet.createRow(r);
-        writeCell(totalRow, 0, "TOTAL DO PERÍODO", styles.summaryLabel);
-        writeCell(totalRow, 1, String.valueOf(grandTotalQty), styles.summaryValue);
-        writeCell(totalRow, 2, "R$ " + money.format(grandTotalMoney), styles.summaryValue);
+        Row totalRow = getOrCreateRow(sheet, r);
+        writeCell(totalRow, startColumn, "TOTAL DO PERÍODO", styles.summaryLabel);
+        writeCell(totalRow, startColumn + 1, String.valueOf(grandTotalQty), styles.summaryValue);
+        writeCell(totalRow, startColumn + 2, "R$ " + money.format(grandTotalMoney), styles.summaryValue);
     }
 
     private static void writeCell(Row row, int col, String value, CellStyle style) {
@@ -475,24 +497,28 @@ public class MealService {
         }
     }
 
-    private static String truncate(String text, int maxLength) {
-        if (text == null) {
-            return "";
-        }
-        return text.length() <= maxLength ? text : text.substring(0, Math.max(0, maxLength - 3)) + "...";
-    }
 
     /** Human-readable description of the filters actually applied -- shown in the report header, or omitted if none. */
-    private static String describeFilters(String category, MealType type, Employee employee) {
+    private static String describeFilters(ReportFilters filters) {
         List<String> parts = new ArrayList<>();
-        if (category != null && !category.isBlank()) {
-            parts.add("Categoria: " + category);
+        if (!filters.categories().isEmpty()) {
+            String label = filters.excludeCategories() ? "Categoria (exceto)" : "Categoria";
+            String values = filters.categories().stream()
+                    .sorted(String.CASE_INSENSITIVE_ORDER)
+                    .collect(Collectors.joining(", "));
+            parts.add(label + ": " + values);
         }
-        if (type != null) {
-            parts.add("Tipo: " + type.getDescription());
+        if (!filters.types().isEmpty()) {
+            String label = filters.excludeTypes() ? "Tipo (exceto)" : "Tipo";
+            List<MealType> orderedTypes = new ArrayList<>(filters.types());
+            orderedTypes.sort(Comparator.comparingInt(t -> java.util.Arrays.asList(TYPE_DISPLAY_ORDER).indexOf(t)));
+            String values = orderedTypes.stream()
+                    .map(MealType::getDescription)
+                    .collect(Collectors.joining(", "));
+            parts.add(label + ": " + values);
         }
-        if (employee != null) {
-            parts.add("Colaborador: " + employee.getName());
+        if (filters.employee() != null) {
+            parts.add("Colaborador: " + filters.employee().getName());
         }
         return String.join("   ", parts);
     }
@@ -536,12 +562,21 @@ public class MealService {
      * record), so they're sorted alphabetically instead of a fixed order. A
      * meal whose employee has no category set is grouped under "Sem categoria".
      */
+    /**
+     * Normalizes an employee's category for display/grouping purposes: a
+     * null/blank category (employee record with no category set) is grouped
+     * under "Sem categoria" instead of showing up blank. Shared by the
+     * category breakdown line below and by the PDF report's category
+     * grouping (generatePeriodReport), so both treat "no category" the same way.
+     */
+    private static String normalizeCategory(String category) {
+        return (category == null || category.isBlank()) ? "Sem categoria" : category;
+    }
+
     private static String formatCategoryBreakdown(List<Meal> meals) {
         Map<String, Long> countByCategory = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         for (Meal m : meals) {
-            String category = m.getEmployeeCategory();
-            category = (category == null || category.isBlank()) ? "Sem categoria" : category;
-            countByCategory.merge(category, 1L, Long::sum);
+            countByCategory.merge(normalizeCategory(m.getEmployeeCategory()), 1L, Long::sum);
         }
 
         StringBuilder result = new StringBuilder();

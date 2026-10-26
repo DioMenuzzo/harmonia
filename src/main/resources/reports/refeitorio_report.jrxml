@@ -3,16 +3,23 @@
      Jaspersoft Studio (free plugin for Eclipse-based IDEs) to adjust layout,
      fonts, hospital logo, etc.
 
-     "Modern" layout: colored title band (same green as the system's
-     buttons), light column header, zebra-striped rows and a highlighted
-     total in the footer. Shows 6 columns: Employee, Category, Type, Time,
-     Date and Price; id is still available as a field (data) but isn't
-     printed. The summary band also shows, besides the period's total price,
-     the quantity of meals broken down by type ("typeBreakdown" parameter)
-     and by employee category ("categoryBreakdown" parameter), both
-     computed in MealService.generatePeriodReport. The title band shows any
-     category/type/employee filters applied (see the "filters" parameter)
-     besides the date range, which always applies. -->
+     "Blocks" layout: the report is organized in one block per employee
+     category (categoryGroup), and inside each block, one sub-section per
+     employee who used the cafeteria in that category (employeeGroup),
+     listing their meals (type, time, date, price). Each category block ends
+     with its own total (quantity + a per-type breakdown). This requires the
+     data fed into the report to already be sorted by category, then by
+     employee, then by date/time — see the sort in
+     MealService.generatePeriodReport, right before it calls
+     ReportGenerator.generatePdf with this template.
+
+     A grand total for the whole period (all categories combined) is still
+     shown at the very end (summary band), same as before — besides the
+     total price, it shows the quantity of meals broken down by type
+     ("typeBreakdown" parameter) and by employee category ("categoryBreakdown"
+     parameter), both computed in MealService.generatePeriodReport. The title
+     band shows any category/type/employee filters applied (see the
+     "filters" parameter) besides the date range, which always applies. -->
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
               xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
@@ -42,12 +49,135 @@
     <parameter name="filters" class="java.lang.String"/>
 
     <field name="id" class="java.lang.Integer"/>
+    <field name="employeeId" class="java.lang.Integer"/>
     <field name="employeeName" class="java.lang.String"/>
     <field name="employeeCategory" class="java.lang.String"/>
     <field name="date" class="java.time.LocalDate"/>
     <field name="time" class="java.time.LocalTime"/>
     <field name="price" class="java.math.BigDecimal"/>
     <field name="type" class="com.hospital.harmonia.model.MealType"/>
+
+    <!-- Per-category counters (reset every time categoryGroup breaks). One
+         "Count" variable per meal type, each only counting rows of that
+         type (null otherwise, which Count ignores) — the closest thing to
+         a per-type tally that plain JasperReports variables can do without
+         a subreport or scriptlet. -->
+    <variable name="categoryTotal" class="java.lang.Integer" resetType="Group" resetGroup="categoryGroup" calculation="Count">
+        <variableExpression><![CDATA[Integer.valueOf(1)]]></variableExpression>
+    </variable>
+    <variable name="categoryQtyDejejum" class="java.lang.Integer" resetType="Group" resetGroup="categoryGroup" calculation="Count">
+        <variableExpression><![CDATA[$F{type} == com.hospital.harmonia.model.MealType.CAFE_DA_MANHA ? Integer.valueOf(1) : null]]></variableExpression>
+    </variable>
+    <variable name="categoryQtyAlmoco" class="java.lang.Integer" resetType="Group" resetGroup="categoryGroup" calculation="Count">
+        <variableExpression><![CDATA[$F{type} == com.hospital.harmonia.model.MealType.ALMOCO ? Integer.valueOf(1) : null]]></variableExpression>
+    </variable>
+    <variable name="categoryQtyJantar" class="java.lang.Integer" resetType="Group" resetGroup="categoryGroup" calculation="Count">
+        <variableExpression><![CDATA[$F{type} == com.hospital.harmonia.model.MealType.JANTAR ? Integer.valueOf(1) : null]]></variableExpression>
+    </variable>
+    <variable name="categoryQtyCeia" class="java.lang.Integer" resetType="Group" resetGroup="categoryGroup" calculation="Count">
+        <variableExpression><![CDATA[$F{type} == com.hospital.harmonia.model.MealType.CEIA ? Integer.valueOf(1) : null]]></variableExpression>
+    </variable>
+    <variable name="categoryQtyLanche" class="java.lang.Integer" resetType="Group" resetGroup="categoryGroup" calculation="Count">
+        <variableExpression><![CDATA[$F{type} == com.hospital.harmonia.model.MealType.LANCHE ? Integer.valueOf(1) : null]]></variableExpression>
+    </variable>
+
+    <!-- Per-employee subtotal (reset every time employeeGroup breaks). -->
+    <variable name="employeeMealCount" class="java.lang.Integer" resetType="Group" resetGroup="employeeGroup" calculation="Count">
+        <variableExpression><![CDATA[Integer.valueOf(1)]]></variableExpression>
+    </variable>
+
+    <!-- Outer group: one block per employee category. The expression below is
+         the SAME key MealService.categoryGroupKey() sorts by (blank/null goes
+         to "Sem categoria", then uppercase) and the two must stay in sync:
+         category is free text typed by hand, so "Alunos" and "ALUNOS" are the
+         same group of people and belong in one block. Grouping by the raw
+         value while the data was sorted case-insensitively produced two
+         blocks with the same title and split totals, contradicting the
+         combined figure in the summary band at the end. -->
+    <group name="categoryGroup" isReprintHeaderOnEachPage="true">
+        <groupExpression><![CDATA[(($F{employeeCategory} == null || $F{employeeCategory}.trim().length() == 0) ? "Sem categoria" : $F{employeeCategory}).toUpperCase()]]></groupExpression>
+        <groupHeader>
+            <band height="34">
+                <rectangle>
+                    <reportElement x="30" y="8" width="535" height="22" backcolor="#4C7A1F" mode="Opaque"/>
+                    <graphicElement>
+                        <pen lineWidth="0.0"/>
+                    </graphicElement>
+                </rectangle>
+                <textField>
+                    <reportElement x="40" y="8" width="515" height="22" forecolor="#FFFFFF"/>
+                    <textElement verticalAlignment="Middle">
+                        <font size="11" isBold="true"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA["CATEGORIA: " + (($F{employeeCategory} == null || $F{employeeCategory}.trim().length() == 0) ? "Sem categoria" : $F{employeeCategory}).toUpperCase()]]></textFieldExpression>
+                </textField>
+            </band>
+        </groupHeader>
+        <groupFooter>
+            <band height="46">
+                <rectangle>
+                    <reportElement x="30" y="2" width="535" height="36" backcolor="#EAF2E2" mode="Opaque"/>
+                    <graphicElement>
+                        <pen lineWidth="0.75" lineColor="#B9D19B"/>
+                    </graphicElement>
+                </rectangle>
+                <textField>
+                    <reportElement x="40" y="6" width="400" height="14" forecolor="#2F5C0E"/>
+                    <textElement verticalAlignment="Middle">
+                        <font size="9" isBold="true"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA["Total da categoria: " + $V{categoryTotal} + " refeição(ões)"]]></textFieldExpression>
+                </textField>
+                <textField>
+                    <reportElement x="40" y="20" width="515" height="14" forecolor="#33422F"/>
+                    <textElement verticalAlignment="Middle">
+                        <font size="8"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA["Dejejum: " + $V{categoryQtyDejejum} + "   Almoço: " + $V{categoryQtyAlmoco} + "   Jantar: " + $V{categoryQtyJantar} + "   Ceia: " + $V{categoryQtyCeia} + "   Lanche: " + $V{categoryQtyLanche}]]></textFieldExpression>
+                </textField>
+            </band>
+        </groupFooter>
+    </group>
+
+    <!-- Inner group (nested inside categoryGroup, by declaration order): one
+         sub-section per employee, listing their meals below their name.
+         Grouped by employeeId, NOT by employeeName: the database enforces a
+         unique matrícula but not a unique name, so two different people can
+         both be "Maria Silva" — grouping by name merged their meals into one
+         block under one total. The header still displays the name; two
+         same-named employees now produce two separate blocks, each with its
+         own subtotal. -->
+    <group name="employeeGroup" isReprintHeaderOnEachPage="true">
+        <groupExpression><![CDATA[$F{employeeId}]]></groupExpression>
+        <groupHeader>
+            <band height="20">
+                <textField>
+                    <reportElement x="45" y="2" width="400" height="16" forecolor="#33422F"/>
+                    <textElement verticalAlignment="Middle">
+                        <font size="10" isBold="true"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA[$F{employeeName}]]></textFieldExpression>
+                </textField>
+                <line>
+                    <reportElement x="45" y="18" width="120" height="1"/>
+                    <graphicElement>
+                        <pen lineColor="#C9D4C0"/>
+                    </graphicElement>
+                </line>
+            </band>
+        </groupHeader>
+        <groupFooter>
+            <band height="16">
+                <textField>
+                    <reportElement x="70" y="0" width="300" height="14" forecolor="#6B7566"/>
+                    <textElement verticalAlignment="Middle">
+                        <font size="8" isItalic="true"/>
+                    </textElement>
+                    <textFieldExpression><![CDATA[$V{employeeMealCount} + " refeição(ões)"]]></textFieldExpression>
+                </textField>
+            </band>
+        </groupFooter>
+    </group>
 
     <title>
         <band height="86">
@@ -96,52 +226,38 @@
     </title>
 
     <columnHeader>
-        <band height="26">
+        <band height="20">
             <rectangle>
-                <reportElement x="30" y="4" width="535" height="20" backcolor="#EFF3EB" mode="Opaque"/>
+                <reportElement x="30" y="0" width="535" height="18" backcolor="#EFF3EB" mode="Opaque"/>
                 <graphicElement>
                     <pen lineWidth="0.0"/>
                 </graphicElement>
             </rectangle>
             <staticText>
-                <reportElement x="30" y="4" width="120" height="20" forecolor="#33422F"/>
+                <reportElement x="70" y="0" width="120" height="18" forecolor="#33422F"/>
                 <textElement verticalAlignment="Middle">
-                    <font size="10" isBold="true"/>
-                </textElement>
-                <text><![CDATA[COLABORADOR]]></text>
-            </staticText>
-            <staticText>
-                <reportElement x="150" y="4" width="90" height="20" forecolor="#33422F"/>
-                <textElement verticalAlignment="Middle">
-                    <font size="10" isBold="true"/>
-                </textElement>
-                <text><![CDATA[CATEGORIA]]></text>
-            </staticText>
-            <staticText>
-                <reportElement x="240" y="4" width="80" height="20" forecolor="#33422F"/>
-                <textElement textAlignment="Center" verticalAlignment="Middle">
-                    <font size="10" isBold="true"/>
+                    <font size="9" isBold="true"/>
                 </textElement>
                 <text><![CDATA[TIPO]]></text>
             </staticText>
             <staticText>
-                <reportElement x="320" y="4" width="60" height="20" forecolor="#33422F"/>
+                <reportElement x="200" y="0" width="80" height="18" forecolor="#33422F"/>
                 <textElement textAlignment="Center" verticalAlignment="Middle">
-                    <font size="10" isBold="true"/>
+                    <font size="9" isBold="true"/>
                 </textElement>
                 <text><![CDATA[HORÁRIO]]></text>
             </staticText>
             <staticText>
-                <reportElement x="380" y="4" width="80" height="20" forecolor="#33422F"/>
+                <reportElement x="290" y="0" width="100" height="18" forecolor="#33422F"/>
                 <textElement textAlignment="Center" verticalAlignment="Middle">
-                    <font size="10" isBold="true"/>
+                    <font size="9" isBold="true"/>
                 </textElement>
                 <text><![CDATA[DATA]]></text>
             </staticText>
             <staticText>
-                <reportElement x="460" y="4" width="105" height="20" forecolor="#33422F"/>
+                <reportElement x="460" y="0" width="105" height="18" forecolor="#33422F"/>
                 <textElement textAlignment="Right" verticalAlignment="Middle">
-                    <font size="10" isBold="true"/>
+                    <font size="9" isBold="true"/>
                 </textElement>
                 <text><![CDATA[PREÇO (R$)]]></text>
             </staticText>
@@ -149,55 +265,35 @@
     </columnHeader>
 
     <detail>
-        <band height="24">
+        <band height="18">
             <textField>
-                <reportElement x="30" y="0" width="120" height="24" style="zebraRow"/>
+                <reportElement x="70" y="0" width="120" height="18" style="zebraRow"/>
                 <textElement verticalAlignment="Middle">
-                    <font size="10"/>
-                </textElement>
-                <textFieldExpression><![CDATA[$F{employeeName}]]></textFieldExpression>
-            </textField>
-            <textField isBlankWhenNull="true">
-                <reportElement x="150" y="0" width="90" height="24" style="zebraRow"/>
-                <textElement verticalAlignment="Middle">
-                    <font size="10"/>
-                </textElement>
-                <textFieldExpression><![CDATA[$F{employeeCategory}]]></textFieldExpression>
-            </textField>
-            <textField>
-                <reportElement x="240" y="0" width="80" height="24" style="zebraRow"/>
-                <textElement textAlignment="Center" verticalAlignment="Middle">
-                    <font size="10"/>
+                    <font size="9"/>
                 </textElement>
                 <textFieldExpression><![CDATA[$F{type}.getDescription()]]></textFieldExpression>
             </textField>
             <textField pattern="HH:mm">
-                <reportElement x="320" y="0" width="60" height="24" style="zebraRow"/>
+                <reportElement x="200" y="0" width="80" height="18" style="zebraRow"/>
                 <textElement textAlignment="Center" verticalAlignment="Middle">
-                    <font size="10"/>
+                    <font size="9"/>
                 </textElement>
                 <textFieldExpression><![CDATA[java.sql.Time.valueOf($F{time})]]></textFieldExpression>
             </textField>
             <textField pattern="dd/MM/yyyy">
-                <reportElement x="380" y="0" width="80" height="24" style="zebraRow"/>
+                <reportElement x="290" y="0" width="100" height="18" style="zebraRow"/>
                 <textElement textAlignment="Center" verticalAlignment="Middle">
-                    <font size="10"/>
+                    <font size="9"/>
                 </textElement>
                 <textFieldExpression><![CDATA[java.sql.Date.valueOf($F{date})]]></textFieldExpression>
             </textField>
             <textField pattern="#,##0.00">
-                <reportElement x="460" y="0" width="105" height="24" style="zebraRow"/>
+                <reportElement x="460" y="0" width="105" height="18" style="zebraRow"/>
                 <textElement textAlignment="Right" verticalAlignment="Middle">
-                    <font size="10"/>
+                    <font size="9"/>
                 </textElement>
                 <textFieldExpression><![CDATA[$F{price}]]></textFieldExpression>
             </textField>
-            <line>
-                <reportElement x="30" y="23" width="535" height="1"/>
-                <graphicElement>
-                    <pen lineColor="#E4E7E1"/>
-                </graphicElement>
-            </line>
         </band>
     </detail>
 
