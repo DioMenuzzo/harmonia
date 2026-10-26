@@ -24,7 +24,7 @@ public class HubController implements Initializable {
     private static final Logger log = LoggerFactory.getLogger(HubController.class);
 
     @FXML private VBox cafeteriaCard;
-    @FXML private VBox assetDisposalCard;
+    @FXML private VBox agendaTelefonicaCard;
     @FXML private VBox technicalSupportCard;
     @FXML private VBox usersCard;
     @FXML private Label userNameLabel;
@@ -46,17 +46,19 @@ public class HubController implements Initializable {
             }
         }
 
-        // Role-based access control: modules the user doesn't have permission
+        // Per-user access control (see the comment on Role for why this is no
+        // longer Role-derived): modules the account doesn't have permission
         // for are hidden in the hub. The same check is repeated in the
-        // onOpen* methods below (defense in depth).
-        cafeteriaCard.setVisible(user.getRole().canAccessCafeteria());
-        cafeteriaCard.setManaged(user.getRole().canAccessCafeteria());
+        // onOpen* methods below (defense in depth). Gerenciar Usuários is the
+        // one exception -- still Role-gated (CIAU only), see Role's comment.
+        cafeteriaCard.setVisible(user.isAccessCafeteria());
+        cafeteriaCard.setManaged(user.isAccessCafeteria());
 
-        assetDisposalCard.setVisible(user.getRole().canAccessAssetDisposal());
-        assetDisposalCard.setManaged(user.getRole().canAccessAssetDisposal());
+        agendaTelefonicaCard.setVisible(user.isAccessAgendaTelefonica());
+        agendaTelefonicaCard.setManaged(user.isAccessAgendaTelefonica());
 
-        technicalSupportCard.setVisible(user.getRole().canAccessTechnicalSupport());
-        technicalSupportCard.setManaged(user.getRole().canAccessTechnicalSupport());
+        technicalSupportCard.setVisible(user.isAccessTechnicalSupport());
+        technicalSupportCard.setManaged(user.isAccessTechnicalSupport());
 
         usersCard.setVisible(user.getRole().canManageUsers());
         usersCard.setManaged(user.getRole().canManageUsers());
@@ -64,7 +66,7 @@ public class HubController implements Initializable {
 
     @FXML
     private void onOpenCafeteria() {
-        if (!SessionManager.getLoggedInUser().getRole().canAccessCafeteria()) {
+        if (!SessionManager.getLoggedInUser().isAccessCafeteria()) {
             AlertUtil.warning("Acesso negado", "Seu perfil não tem acesso ao módulo Refeitório.");
             return;
         }
@@ -72,17 +74,17 @@ public class HubController implements Initializable {
     }
 
     @FXML
-    private void onOpenAssetDisposal() {
-        if (!SessionManager.getLoggedInUser().getRole().canAccessAssetDisposal()) {
-            AlertUtil.warning("Acesso negado", "Seu perfil não tem acesso ao módulo Descarte de Ativos.");
+    private void onOpenAgendaTelefonica() {
+        if (!SessionManager.getLoggedInUser().isAccessAgendaTelefonica()) {
+            AlertUtil.warning("Acesso negado", "Seu perfil não tem acesso ao módulo Agenda Telefônica.");
             return;
         }
-        openScreen("/fxml/descarte_ativos.fxml", "Descarte de Ativos - Harmonia");
+        openScreen("/fxml/agenda_telefonica.fxml", "Agenda Telefônica - Harmonia");
     }
 
     @FXML
     private void onOpenTechnicalSupport() {
-        if (!SessionManager.getLoggedInUser().getRole().canAccessTechnicalSupport()) {
+        if (!SessionManager.getLoggedInUser().isAccessTechnicalSupport()) {
             AlertUtil.warning("Acesso negado", "Seu perfil não tem acesso ao módulo Assistência Técnica.");
             return;
         }
@@ -105,7 +107,7 @@ public class HubController implements Initializable {
 
     @FXML
     private void onAbout() {
-        AlertUtil.info("Sobre", "Harmonia - Sistema de Gestão v1.0.0\nMódulos: Refeitório, Descarte de Ativos, Assistência Técnica, Usuários.");
+        AlertUtil.info("Sobre", "Harmonia - Sistema de Gestão v1.0.0\nMódulos: Refeitório, Agenda Telefônica, Assistência Técnica, Usuários.");
     }
 
     @FXML

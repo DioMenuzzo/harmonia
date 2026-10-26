@@ -22,7 +22,7 @@
                     <MenuItem onAction="#onLogout" text="Voltar para Tela de Login" />
                 </Menu>
                 <Menu text="Ajuda">
-                    <MenuItem onAction="#onAbout" text="Guias" />
+                    <MenuItem onAction="#onAbout" text="Sobre" />
                <MenuItem onAction="#onOpenWebsite" text="Contate o CIAU" />
                 </Menu>
             </MenuBar>
@@ -87,20 +87,20 @@
                   </font></Label>
                 </VBox>
 
-                <VBox fx:id="assetDisposalCard" alignment="CENTER" onMouseClicked="#onOpenAssetDisposal" prefHeight="160.0" prefWidth="200.0" styleClass="module-card" stylesheets="@../css/styles.css">
+                <VBox fx:id="agendaTelefonicaCard" alignment="CENTER" onMouseClicked="#onOpenAgendaTelefonica" prefHeight="160.0" prefWidth="200.0" styleClass="module-card" stylesheets="@../css/styles.css">
                <ImageView fitHeight="70.0" fitWidth="70.0" pickOnBounds="true" preserveRatio="true">
                   <image>
-                     <Image url="@../images/da-icon.png" />
+                     <Image url="@../images/agenda-icon.png" />
                   </image>
                   <VBox.margin>
                      <Insets bottom="10.0" />
                   </VBox.margin>
                </ImageView>
-                    <Label text="DESCARTE DE ATIVOS">
+                    <Label text="AGENDA TELEFÔNICA">
                   <font>
                      <Font name="Microsoft YaHei UI Bold" size="12.0" />
                   </font></Label>
-                    <Label styleClass="description" text="Gerador de Laudos" wrapText="true">
+                    <Label alignment="CENTER" styleClass="description" text="Contatos e Telefones Úteis" wrapText="true">
                   <font>
                      <Font name="Microsoft YaHei UI" size="12.0" />
                   </font></Label>
