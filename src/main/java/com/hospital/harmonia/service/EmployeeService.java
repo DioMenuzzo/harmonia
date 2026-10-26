@@ -61,7 +61,7 @@ public class EmployeeService {
             throw new IllegalArgumentException("Nome do colaborador é obrigatório.");
         }
         if (e.getRegistrationNumber() == null || e.getRegistrationNumber().isBlank()) {
-            throw new IllegalArgumentException("CPF do colaborador é obrigatório.");
+            throw new IllegalArgumentException("Matrícula do colaborador é obrigatória.");
         }
     }
 }
