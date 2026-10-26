@@ -56,4 +56,40 @@ public class MealPriceDaoImpl implements MealPriceDao {
             throw new DataAccessException("Erro ao salvar preço de " + type, e);
         }
     }
+
+    @Override
+    public void saveAll(Map<MealType, BigDecimal> prices) {
+        if (prices.isEmpty()) {
+            return;
+        }
+        // One connection, one transaction for every type in the map: the
+        // screen saves all configured prices together, and a partial save
+        // (say, breakfast updated but lunch not, because the connection
+        // dropped mid-loop) would leave meals being priced against two
+        // different price tables for the rest of the day. save() above still
+        // exists for the single-type case and is unaffected by this method.
+        String sql = "INSERT INTO precos_refeicao (tipo, preco) VALUES (?, ?) " +
+                "ON CONFLICT (tipo) DO UPDATE SET preco = EXCLUDED.preco";
+        try (Connection conn = DatabaseConfig.getConnection()) {
+            conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                for (Map.Entry<MealType, BigDecimal> entry : prices.entrySet()) {
+                    stmt.setString(1, entry.getKey().name());
+                    stmt.setBigDecimal(2, entry.getValue());
+                    stmt.addBatch();
+                }
+                stmt.executeBatch();
+                conn.commit();
+                log.info("Meal prices saved atomically for {} type(s).", prices.size());
+            } catch (SQLException e) {
+                conn.rollback();
+                throw e;
+            } finally {
+                conn.setAutoCommit(true);
+            }
+        } catch (SQLException e) {
+            log.error("Failed to save meal prices for {} type(s)", prices.size(), e);
+            throw new DataAccessException("Erro ao salvar preços de refeição", e);
+        }
+    }
 }

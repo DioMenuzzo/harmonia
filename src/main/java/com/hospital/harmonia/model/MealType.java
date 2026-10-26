@@ -39,11 +39,11 @@ public enum MealType {
         return description;
     }
 
-    // Tolerância combinada com o RH: o funcionário pode bater o ponto até
-    // esse tanto de minutos antes do início ou depois do fim do horário
-    // oficial de cada refeição, que ainda conta como dentro do horário (em
-    // vez de recusar o registro por causa de poucos minutos de diferença).
-    // Aplicada nos dois lados de toda janela -- ver within().
+    // Tolerance agreed with HR: an employee can clock in up to this many
+    // minutes before the start or after the end of each meal's official
+    // time window and it still counts as within that window (instead of
+    // rejecting the record over a difference of a few minutes). Applied to
+    // both ends of every window -- see within().
     private static final int TOLERANCE_MINUTES = 20;
 
     /**
@@ -87,12 +87,12 @@ public enum MealType {
     }
 
     /**
-     * [startInclusive, endExclusive), com TOLERANCE_MINUTES de folga aplicada
-     * nos dois lados (startInclusive fica mais cedo, endExclusive fica mais
-     * tarde). Handles a window that wraps past midnight (start later than
-     * end in the clock, e.g. 23:00 -> 03:00 for Ceia): in that case the time
-     * matches if it's at/after the start OR before the end, instead of
-     * requiring both like a same-day window.
+     * [startInclusive, endExclusive), with TOLERANCE_MINUTES of slack applied
+     * to both ends (startInclusive gets earlier, endExclusive gets later).
+     * Handles a window that wraps past midnight (start later than end in the
+     * clock, e.g. 23:00 -> 03:00 for Ceia): in that case the time matches if
+     * it's at/after the start OR before the end, instead of requiring both
+     * like a same-day window.
      */
     private static boolean within(LocalTime time, LocalTime startInclusive, LocalTime endExclusive) {
         LocalTime toleratedStart = startInclusive.minusMinutes(TOLERANCE_MINUTES);

@@ -164,6 +164,72 @@ class MealServiceTest {
         assertEquals(2, fakeDao.saved.size());
     }
 
+    // --- Ordering the PDF report depends on (see MealService.reportOrder) ---
+
+    private static Meal mealOf(int employeeId, String employeeName, String category, int day, int hour) {
+        Meal meal = validMeal();
+        meal.setEmployeeId(employeeId);
+        meal.setEmployeeName(employeeName);
+        meal.setEmployeeCategory(category);
+        meal.setDate(LocalDate.of(2026, 2, day));
+        meal.setTime(LocalTime.of(hour, 0));
+        return meal;
+    }
+
+    private static List<Integer> employeeIdsOf(List<Meal> meals) {
+        return meals.stream().map(Meal::getEmployeeId).toList();
+    }
+
+    @Test
+    void reportOrder_keepsTwoSpellingsOfTheSameCategoryInOneBlock() {
+        // Category is free text typed by hand, so the same group of people can
+        // be recorded as "Alunos" on one employee and "ALUNOS" on another. The
+        // report must treat them as one category, otherwise JasperReports emits
+        // two blocks with the same title and split totals.
+        Meal ana = mealOf(1, "Ana", "ALUNOS", 10, 12);
+        Meal bruno = mealOf(2, "Bruno", "Alunos", 10, 12);
+        Meal carla = mealOf(3, "Carla", "alunos", 10, 12);
+        Meal diego = mealOf(4, "Diego", "FUNCIONARIOS", 10, 12);
+
+        List<Meal> sorted = new ArrayList<>(List.of(diego, carla, ana, bruno));
+        sorted.sort(MealService.reportOrder());
+
+        // The three Alunos records come first and contiguously, in name order,
+        // with no Funcionarios record splitting the block in the middle.
+        assertEquals(List.of(1, 2, 3, 4), employeeIdsOf(sorted));
+    }
+
+    @Test
+    void reportOrder_separatesTwoEmployeesWhoShareTheSameName() {
+        // Only the matrícula is unique in the database -- two different people
+        // can both be "Maria Silva". Their meals must not be merged into one
+        // block with one total on the report used for billing.
+        Meal firstMaria = mealOf(7, "Maria Silva", "ALUNOS", 10, 12);
+        Meal firstMariaAgain = mealOf(7, "Maria Silva", "ALUNOS", 11, 12);
+        Meal secondMaria = mealOf(9, "Maria Silva", "Alunos", 10, 11);
+
+        List<Meal> sorted = new ArrayList<>(List.of(secondMaria, firstMariaAgain, firstMaria));
+        sorted.sort(MealService.reportOrder());
+
+        // Each matrícula's meals stay together instead of interleaving by time.
+        assertEquals(List.of(7, 7, 9), employeeIdsOf(sorted));
+        assertEquals(10, sorted.get(0).getDate().getDayOfMonth(), "each employee's meals stay chronological");
+        assertEquals(11, sorted.get(1).getDate().getDayOfMonth());
+    }
+
+    @Test
+    void reportOrder_groupsEmployeesWithNoCategoryTogether() {
+        Meal noCategory = mealOf(1, "Ana", null, 10, 12);
+        Meal blankCategory = mealOf(2, "Bruno", "   ", 10, 12);
+        Meal withCategory = mealOf(3, "Carla", "ALUNOS", 10, 12);
+
+        List<Meal> sorted = new ArrayList<>(List.of(noCategory, withCategory, blankCategory));
+        sorted.sort(MealService.reportOrder());
+
+        // "ALUNOS" sorts before "SEM CATEGORIA"; null and blank land in the same block.
+        assertEquals(List.of(3, 1, 2), employeeIdsOf(sorted));
+    }
+
     @Test
     void findByPeriod_rejectsAStartDateAfterTheEndDate() {
         LocalDate start = LocalDate.of(2026, 2, 10);
