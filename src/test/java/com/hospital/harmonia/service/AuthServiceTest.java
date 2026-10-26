@@ -79,5 +79,46 @@ class AuthServiceTest {
         public void updatePasswordHash(int userId, String newPasswordHash) {
             user.setPasswordHash(newPasswordHash);
         }
+
+        @Override
+        public void updateCredentials(int userId, String newUsername, String newPasswordHash) {
+            if (newUsername != null) {
+                user.setUsername(newUsername);
+            }
+            if (newPasswordHash != null) {
+                user.setPasswordHash(newPasswordHash);
+            }
+        }
+
+        // The four methods below were added to UserDao for user registration
+        // and the module-permissions screen (UserManagementController) --
+        // AuthService itself never calls them, but the fake still has to
+        // implement the whole interface. They act on the single in-memory
+        // "user" this fake holds, same as updateUsername/updatePasswordHash
+        // above, ignoring userId (there is only ever one user here).
+
+        @Override
+        public User save(User newUser) {
+            throw new UnsupportedOperationException(
+                    "FakeUserDao holds a single pre-built user; not exercised by AuthServiceTest.");
+        }
+
+        @Override
+        public void deactivate(int userId) {
+            user.setActive(false);
+        }
+
+        @Override
+        public void activate(int userId) {
+            user.setActive(true);
+        }
+
+        @Override
+        public void updatePermissions(int userId, boolean accessCafeteria, boolean accessAgendaTelefonica,
+                                       boolean accessTechnicalSupport) {
+            user.setAccessCafeteria(accessCafeteria);
+            user.setAccessAgendaTelefonica(accessAgendaTelefonica);
+            user.setAccessTechnicalSupport(accessTechnicalSupport);
+        }
     }
 }
