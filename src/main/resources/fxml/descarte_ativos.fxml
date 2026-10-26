@@ -13,7 +13,7 @@
 
     <top>
         <HBox styleClass="top-bar" spacing="12" alignment="CENTER_LEFT">
-            <Button text="◀ Voltar ao hub" onAction="#onBack"/>
+            <Button text="◀ Voltar" onAction="#onBack"/>
             <Label text="Módulo Descarte de Ativos" styleClass="top-bar-text"/>
         </HBox>
     </top>

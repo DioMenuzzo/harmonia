@@ -1,12 +1,7 @@
 package com.hospital.harmonia.controller;
 
 import com.hospital.harmonia.App;
-import com.hospital.harmonia.util.AlertUtil;
 import javafx.fxml.FXML;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.IOException;
 
 /**
  * Placeholder screen for the Asset Disposal module.
@@ -20,15 +15,8 @@ import java.io.IOException;
  */
 public class AssetDisposalController {
 
-    private static final Logger log = LoggerFactory.getLogger(AssetDisposalController.class);
-
     @FXML
     private void onBack() {
-        try {
-            App.switchScene("/fxml/hub.fxml", "Harmonia");
-        } catch (IOException e) {
-            log.error("Failed to navigate back to the hub", e);
-            AlertUtil.error("Erro", "Não foi possível voltar ao hub: " + e.getMessage());
-        }
+        App.backToHub();
     }
 }

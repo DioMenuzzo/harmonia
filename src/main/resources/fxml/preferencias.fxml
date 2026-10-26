@@ -18,7 +18,7 @@
 
     <HBox spacing="12" alignment="CENTER_LEFT">
         <Button text="◀ Voltar" onAction="#onBack"/>
-        <Label text="Preferencias" styleClass="title"/>
+        <Label text="Preferências" styleClass="title"/>
     </HBox>
 
     <VBox spacing="8" alignment="CENTER_LEFT">

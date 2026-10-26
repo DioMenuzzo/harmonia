@@ -73,11 +73,6 @@ public class PreferencesController implements Initializable {
 
     @FXML
     private void onBack() {
-        try {
-            App.switchScene("/fxml/hub.fxml", "Harmonia");
-        } catch (IOException e) {
-            log.error("Failed to navigate back to the hub", e);
-            AlertUtil.error("Erro", "Não foi possível voltar ao hub: " + e.getMessage());
-        }
+        App.backToHub();
     }
 }

@@ -1,6 +1,8 @@
 package com.hospital.harmonia;
 
+import com.hospital.harmonia.util.AlertUtil;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.fxml.FXMLLoader;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -32,6 +34,17 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) throws IOException {
+        // Without this, an exception an FXML button/menu handler forgot to
+        // catch just prints a stack trace to a console the hospital staff
+        // never has open -- from their side the screen simply did nothing
+        // when they clicked, with no indication anything went wrong. This
+        // turns that into a Portuguese alert instead, and is the standard
+        // way to catch what would otherwise be silently swallowed on the
+        // JavaFX Application Thread (Thread.currentThread() here IS that
+        // thread, since start() runs on it). setDefaultUncaughtExceptionHandler
+        // in main() below is the same net for any other thread.
+        Thread.currentThread().setUncaughtExceptionHandler(App::handleUncaughtException);
+
         log.info("Harmonia starting up...");
         mainStage = stage;
         mainStage.setTitle("Harmonia");
@@ -100,7 +113,49 @@ public class App extends Application {
         return mainStage;
     }
 
+    /**
+     * Shared by every module controller's "◀ Voltar" button (see onBack() in
+     * CafeteriaController, TechnicalSupportController, AgendaTelefonicaController,
+     * UserManagementController and PreferencesController). Each controller
+     * still needs its own @FXML-annotated onBack() -- FXML's onAction only
+     * binds to an instance method on that specific controller -- but they all
+     * delegate to this one instead of repeating the same try/switchScene/catch/alert.
+     */
+    public static void backToHub() {
+        try {
+            switchScene("/fxml/hub.fxml", "Harmonia");
+        } catch (IOException e) {
+            log.error("Failed to navigate back to the hub", e);
+            AlertUtil.error("Erro", "Não foi possível voltar ao hub: " + e.getMessage());
+        }
+    }
+
+    /**
+     * See the comment in start() -- this is the same safety net for a thread
+     * other than the FX Application Thread. Showing a JavaFX Alert is only
+     * legal from the FX Application Thread, but this handler can just as
+     * well run on some other thread (that's the whole point of also
+     * registering it as the JVM-wide default in main() below) -- so the
+     * alert itself is always dispatched through Platform.runLater instead of
+     * being shown inline, whether or not this call happens to already be on
+     * the FX thread.
+     */
+    private static void handleUncaughtException(Thread thread, Throwable throwable) {
+        log.error("Uncaught exception on thread {}", thread.getName(), throwable);
+        try {
+            Platform.runLater(() -> AlertUtil.error("Erro inesperado",
+                    "Ocorreu um erro inesperado: " + throwable.getMessage()
+                            + "\n\nSe o problema persistir, informe o suporte técnico."));
+        } catch (Exception alertFailure) {
+            // Best-effort: if even scheduling the alert fails (e.g. the FX
+            // toolkit isn't running anymore during shutdown), don't let that
+            // throw again from inside an exception handler -- just log it.
+            log.error("Failed to show the uncaught-exception alert", alertFailure);
+        }
+    }
+
     public static void main(String[] args) {
+        Thread.setDefaultUncaughtExceptionHandler(App::handleUncaughtException);
         launch(args);
     }
 }
