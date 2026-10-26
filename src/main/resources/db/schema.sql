@@ -20,25 +20,56 @@
 -- ---------------------------------------------------------------------
 -- MÓDULO: LOGIN / USUÁRIOS
 -- ---------------------------------------------------------------------
+-- perfil (RH/FINANCEIRO/CIAU) is now just a label -- actual module access is
+-- the acesso_* columns below, editable per account on the Gerenciar
+-- Usuários screen (see Role.java's class comment for why this changed).
+-- perfil still exclusively gates that screen itself (CIAU only).
 CREATE TABLE IF NOT EXISTS usuarios (
-    id                    SERIAL PRIMARY KEY,
-    nome_usuario          VARCHAR(50)  NOT NULL UNIQUE,
-    senha_hash            VARCHAR(100) NOT NULL,           -- hash BCrypt, nunca texto puro
-    perfil                VARCHAR(20)  NOT NULL CHECK (perfil IN ('RH', 'FINANCEIRO', 'CIAU')),
-    nome_exibicao         VARCHAR(100) NOT NULL,
-    caminho_foto_perfil   VARCHAR(255),
-    ativo                 BOOLEAN      NOT NULL DEFAULT TRUE,
-    criado_em             TIMESTAMP    NOT NULL DEFAULT NOW()
+    id                            SERIAL PRIMARY KEY,
+    nome_usuario                  VARCHAR(50)  NOT NULL UNIQUE,
+    senha_hash                    VARCHAR(100) NOT NULL,           -- hash BCrypt, nunca texto puro
+    perfil                        VARCHAR(20)  NOT NULL CHECK (perfil IN ('RH', 'FINANCEIRO', 'CIAU')),
+    nome_exibicao                 VARCHAR(100) NOT NULL,
+    caminho_foto_perfil           VARCHAR(255),
+    ativo                         BOOLEAN      NOT NULL DEFAULT TRUE,
+    acesso_refeitorio             BOOLEAN      NOT NULL DEFAULT FALSE,
+    acesso_agenda_telefonica      BOOLEAN      NOT NULL DEFAULT FALSE,
+    acesso_assistencia_tecnica    BOOLEAN      NOT NULL DEFAULT FALSE,
+    criado_em                     TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
 -- ---------------------------------------------------------------------
 -- MÓDULO: REFEITÓRIO
 -- ---------------------------------------------------------------------
+
+-- Categorias dos colaboradores (o grupo pelo qual a refeição é cobrada:
+-- ALUNOS, UNICAMP, FUNCIONARIOS...). Antes isso era texto livre digitado no
+-- cadastro do colaborador, o que fazia a mesma empresa virar "UNICAMP",
+-- "UNICAMP LTDA" e "UNICAM" -- cada variante virando um bloco separado, com
+-- subtotal próprio, no relatório usado para cobrar a terceirizada. Agora é
+-- cadastro próprio, escolhido numa lista na tela.
+CREATE TABLE IF NOT EXISTS categorias (
+    id         SERIAL PRIMARY KEY,
+    nome       VARCHAR(150) NOT NULL,
+    ativo      BOOLEAN      NOT NULL DEFAULT TRUE,
+    criado_em  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- Unicidade que ignora caixa e espaços: impede "Alunos" e "ALUNOS" de
+-- coexistirem mesmo que alguém insira direto no banco, sem passar pela tela.
+-- É a mesma expressão que CategoryDaoImpl.findByName usa na busca.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_categorias_nome ON categorias (UPPER(TRIM(nome)));
+
 CREATE TABLE IF NOT EXISTS colaboradores (
     id                     SERIAL PRIMARY KEY,
     nome                   VARCHAR(150) NOT NULL,
     cpf                    VARCHAR(14)  NOT NULL UNIQUE,
+    -- Coluna legada: guardava a categoria como texto livre. Nada no código
+    -- lê ou grava ela desde a migração para a tabela "categorias" -- fica
+    -- aqui como backup dos valores anteriores e pode ser removida depois que
+    -- a migração estiver validada.
     empresa_terceirizada   VARCHAR(150),
+    categoria_id           INTEGER      REFERENCES categorias(id),
     cargo                  VARCHAR(100),
     -- Marca uma matrícula intencionalmente compartilhada por mais de uma
     -- pessoa (ex.: crachá de plantão médico usado por quem estiver de
@@ -62,6 +93,8 @@ CREATE TABLE IF NOT EXISTS refeicoes (
 );
 
 -- Índice para acelerar a consulta mais comum: relatório por período
+CREATE INDEX IF NOT EXISTS idx_colaboradores_categoria ON colaboradores (categoria_id);
+
 CREATE INDEX IF NOT EXISTS idx_refeicoes_data ON refeicoes (data);
 CREATE INDEX IF NOT EXISTS idx_refeicoes_colaborador ON refeicoes (colaborador_id);
 
@@ -74,6 +107,36 @@ CREATE TABLE IF NOT EXISTS precos_refeicao (
             CHECK (tipo IN ('CAFE_DA_MANHA', 'ALMOCO', 'LANCHE', 'JANTAR', 'CEIA')),
     preco   NUMERIC(10, 2) NOT NULL CHECK (preco >= 0)
 );
+
+-- =====================================================================
+-- MIGRAÇÃO DAS CATEGORIAS: num banco que já existe, o CREATE TABLE
+-- IF NOT EXISTS acima cria a tabela "categorias" vazia, mas NÃO preenche
+-- nada nem liga os colaboradores nela. Para isso existe um script separado,
+-- que pode ser executado como está (não é comentário):
+--
+--   db/migrations/2026-09-17_categorias.sql
+--
+-- Ele cria uma categoria para cada valor distinto já gravado em
+-- empresa_terceirizada (normalizando caixa e espaços, de modo que "Alunos",
+-- "ALUNOS " e "alunos" viram UMA categoria só) e aponta cada colaborador
+-- para a sua. É idempotente: rodar de novo não duplica nada.
+-- =====================================================================
+
+-- =====================================================================
+-- MIGRAÇÃO DAS PERMISSÕES POR MÓDULO: mesma situação -- num banco que já
+-- existe, o CREATE TABLE IF NOT EXISTS de "usuarios" acima não adiciona as
+-- colunas acesso_refeitorio/acesso_agenda_telefonica/acesso_assistencia_tecnica
+-- a uma tabela "usuarios" já existente. Script separado, também executável
+-- como está:
+--
+--   db/migrations/2026-09-18_permissoes_modulo.sql
+--
+-- Ele adiciona as 3 colunas e preenche cada conta já existente com o
+-- acesso que o perfil dela já dava hoje (RH -> Refeitório, FINANCEIRO ->
+-- Agenda, CIAU -> os três), então ninguém perde acesso por causa da
+-- migração -- os ajustes finos (dar Agenda para alguém do RH, por
+-- exemplo) ficam por conta do CIAU depois, pela tela Gerenciar Usuários.
+-- =====================================================================
 
 -- =====================================================================
 -- MIGRAÇÃO: se o banco já existia ANTES da coluna "ativo" (inativação de
@@ -181,6 +244,48 @@ CREATE TABLE IF NOT EXISTS impressoras_manutencao (
 
 CREATE INDEX IF NOT EXISTS idx_impressoras_data_envio ON impressoras_manutencao (data_envio);
 
+-- ---------------------------------------------------------------------
+-- MÓDULO: AGENDA TELEFÔNICA
+-- (substitui a planilha Excel "Agenda v2.0" que a recepção usava antes.
+--  Categoria agora é cadastro próprio (tabela categorias_agenda), com tela
+--  de criar/editar/inativar igual à aba Categorias do Refeitório -- SEPARADA
+--  da tabela "categorias" usada pelos colaboradores: são dois conceitos
+--  diferentes (grupo de cobrança de colaborador x tipo/origem de contato),
+--  então compartilhar a mesma tabela misturaria as duas listas.)
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS categorias_agenda (
+    id         SERIAL PRIMARY KEY,
+    nome       VARCHAR(150) NOT NULL,
+    ativo      BOOLEAN      NOT NULL DEFAULT TRUE,
+    criado_em  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+-- Mesma unicidade (ignora caixa e espaços) da tabela "categorias".
+CREATE UNIQUE INDEX IF NOT EXISTS uq_categorias_agenda_nome ON categorias_agenda (UPPER(TRIM(nome)));
+
+CREATE TABLE IF NOT EXISTS contatos_agenda (
+    id             SERIAL PRIMARY KEY,
+    nome           VARCHAR(150) NOT NULL,
+    categoria_id   INTEGER      REFERENCES categorias_agenda(id),
+    celular        VARCHAR(30),
+    telefone       VARCHAR(30),
+    email          VARCHAR(150),
+    observacao     TEXT,
+    ativo          BOOLEAN      NOT NULL DEFAULT TRUE, -- inativação em vez de exclusão definitiva, mesmo padrão das outras tabelas
+    criado_em      TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_contatos_agenda_categoria ON contatos_agenda (categoria_id);
+
+-- Ambas as tabelas são novas (nenhuma coluna adicionada a tabela já
+-- existente), então os CREATE TABLE IF NOT EXISTS acima já bastam num banco
+-- já em uso -- não precisa de script de migração separado, igual aconteceu
+-- com laudos_baixa_ativos. Os ~5.000 contatos da planilha antiga NÃO foram
+-- importados para cá (ver AgendaTelefonicaController) -- o cadastro começa
+-- vazio, e as categorias também: use a aba Categorias da própria tela para
+-- cadastrar as que fizerem sentido (a conversa que definiu essa lista tinha
+-- ~35 sugestões extraídas da planilha antiga).
+
 -- =====================================================================
 -- DADOS INICIAIS: 3 usuários de exemplo
 -- As senhas abaixo são HASHES BCrypt da senha "mudar123" (apenas para o
@@ -188,10 +293,15 @@ CREATE INDEX IF NOT EXISTS idx_impressoras_data_envio ON impressoras_manutencao 
 -- Para gerar um novo hash, use PasswordUtil.hash("novaSenha") em um teste
 -- Java rápido, ou a classe utilitária em util/PasswordUtil.java.
 -- =====================================================================
-INSERT INTO usuarios (nome_usuario, senha_hash, perfil, nome_exibicao) VALUES
-    ('rh.usuario',         '$2a$12$CwTycUXWue0Thq9StjUM0uJ8Q4z9y5G0Q5Q5Q5Q5Q5Q5Q5Q5Q5Q5', 'RH',         'Recursos Humanos'),
-    ('financeiro.usuario', '$2a$12$CwTycUXWue0Thq9StjUM0uJ8Q4z9y5G0Q5Q5Q5Q5Q5Q5Q5Q5Q5Q5', 'FINANCEIRO', 'Financeiro'),
-    ('ciau.usuario',       '$2a$12$CwTycUXWue0Thq9StjUM0uJ8Q4z9y5G0Q5Q5Q5Q5Q5Q5Q5Q5Q5Q5', 'CIAU',       'CIAU')
+-- acesso_* preenchido aqui só para estes 3 usuários de exemplo terem, de
+-- cara, o mesmo acesso que o perfil deles sempre deu -- num banco já em
+-- uso, é a migração de permissões (acima) que faz esse mesmo preenchimento
+-- para as contas reais já cadastradas.
+INSERT INTO usuarios (nome_usuario, senha_hash, perfil, nome_exibicao,
+                       acesso_refeitorio, acesso_agenda_telefonica, acesso_assistencia_tecnica) VALUES
+    ('rh.usuario',         '$2a$12$CwTycUXWue0Thq9StjUM0uJ8Q4z9y5G0Q5Q5Q5Q5Q5Q5Q5Q5Q5Q5', 'RH',         'Recursos Humanos', TRUE,  FALSE, FALSE),
+    ('financeiro.usuario', '$2a$12$CwTycUXWue0Thq9StjUM0uJ8Q4z9y5G0Q5Q5Q5Q5Q5Q5Q5Q5Q5Q5', 'FINANCEIRO', 'Financeiro',       FALSE, TRUE,  FALSE),
+    ('ciau.usuario',       '$2a$12$CwTycUXWue0Thq9StjUM0uJ8Q4z9y5G0Q5Q5Q5Q5Q5Q5Q5Q5Q5Q5', 'CIAU',       'CIAU',             TRUE,  TRUE,  TRUE)
 ON CONFLICT (nome_usuario) DO NOTHING;
 
 -- ATENÇÃO: os hashes acima são apenas ILUSTRATIVOS (formato correto do BCrypt,
